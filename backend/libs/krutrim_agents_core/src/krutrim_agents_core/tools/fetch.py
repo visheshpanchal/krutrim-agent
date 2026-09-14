@@ -1,0 +1,38 @@
+"""Fetch a URL's content as plain text/markdown."""
+
+from __future__ import annotations
+
+import httpx
+from langchain_core.tools import tool
+from markdownify import markdownify
+
+MAX_FETCH_CHARS = 8_000
+FETCH_TIMEOUT_SECONDS = 15
+
+
+@tool
+async def web_fetch(url: str) -> str:
+    """Fetch a web page and return its content as plain text/markdown.
+
+    Use this to read a specific source in full after finding it via
+    `web_search` (or when the user gives you a URL directly).
+    """
+    try:
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            response = await client.get(
+                url,
+                timeout=FETCH_TIMEOUT_SECONDS,
+                headers={"User-Agent": "Mozilla/5.0 (krutrim-agent)"},
+            )
+        response.raise_for_status()
+    except Exception as exc:  # noqa: BLE001 - surfaced as a tool-visible error, not a crash
+        return f"Error: could not fetch '{url}' ({exc})."
+
+    text = markdownify(response.text, strip=["img"]).strip()
+
+    if len(text) > MAX_FETCH_CHARS:
+        text = (
+            text[:MAX_FETCH_CHARS]
+            + "\n\n[Truncated - page content exceeded the fetch limit.]"
+        )
+    return text

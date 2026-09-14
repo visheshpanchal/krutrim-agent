@@ -1,0 +1,31 @@
+[project]
+name = "krutrim-agent-rag"
+version = "0.1.0"
+description = "RAG library: session-scoped FAISS vector-store I/O, chunking, OpenRouter embeddings, retrieval, the rag_tool, and an opt-in retrieval-injection middleware. Relocated out of krutrim_agent_management so RAG concerns own their own package."
+requires-python = ">=3.11"
+dependencies = [
+    "faisslite @ git+https://github.com/vebcol-org/faisslite.git",
+    "numpy>=2.0.0",
+    "langchain-core>=1.3.14",
+    "langchain-openai>=1.4.1",
+    "qdrant-client>=1.9",
+    "rank-bm25>=0.2.2",
+    "loguru>=0.7.3",
+    "krutrim-agent-management",
+    "krutrim-agent-utils",
+]
+
+[tool.uv.sources]
+krutrim-agent-management = { workspace = true }
+krutrim-agent-utils = { workspace = true }
+
+# faiss-cpu is already an unconditional dependency of faisslite itself, so
+# there's nothing to switch for the cpu case — only gpu needs forwarding, to
+# pull in faisslite's own faiss-gpu-cu12 extra. See docker/backend.Dockerfile
+# and docker/celery.Dockerfile's BUILD arg.
+[project.optional-dependencies]
+gpu = ["faisslite[gpu]"]
+
+[build-system]
+requires = ["uv_build>=0.12.0,<0.13.0"]
+build-backend = "uv_build"

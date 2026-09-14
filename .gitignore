@@ -1,0 +1,77 @@
+# Node / Nx
+node_modules/
+dist/
+tmp/
+.nx/cache/
+.nx/workspace-data/
+*.tsbuildinfo
+.temp
+
+# Local triage notes
+.clean
+
+
+# Real secrets live only in the root .env (git-ignored below). backend/.env,
+# apps/web/.env.local, and docker/.env are committed SYMLINKS pointing at
+# it (see .env.example / docker/README.md) — no secrets in them, just a
+# path, so they're explicitly un-ignored.
+#
+# .env.dev / .env.prod are per-machine copies of .env.example for the dev /
+# prod docker stacks (docker/docker-compose*.yml). .env.example is the only
+# committed template.
+.env
+.env.local
+.env.dev
+.env.prod
+!/backend/.env
+!/apps/web/.env.local
+!/docker/.env
+
+# Python / backend
+backend/.venv/
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/.pytest_cache/
+backend/harness/memory/runs/
+backend/harness/memory/settings.json
+backend/evals/runs/
+backend/evals/providers.json
+backend/.ruff_cache/
+backend/.coverage
+*.egg-info/
+.ruff_cache
+.pytest_cache
+__pycache__
+
+# Docker build secrets (github_token for the private faisslite clone)
+docker/.secrets/
+
+# Electron build output
+apps/desktop/release/
+apps/desktop/dist-renderer/
+
+
+
+# Editors / OS
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Logs
+*.log
+.claude
+
+vite.config.*.timestamp*
+vitest.config.*.timestamp*
+coverage
+celerybeat-schedule.db
+celerybeat-schedule
+dev_cache.py
+temp.py
+.zed
+.vscode
+.nx
+*.patch
+!./patch/*.patch
+.pnpm-store

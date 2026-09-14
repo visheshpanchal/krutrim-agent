@@ -1,0 +1,129 @@
+[tool.uv.workspace]
+members = ["libs/*", "services/*"]
+
+[tool.uv.sources]
+krutrim-agent-utils = { workspace = true }
+krutrim-agent-management = { workspace = true }
+krutrim-agent-agui = { workspace = true }
+krutrim-agent-sandbox = { workspace = true }
+krutrim-agent-rag = { workspace = true }
+krutrim-agent-doc = { workspace = true }
+krutrim-agents-core = { workspace = true }
+krutrim-agents = { workspace = true }
+krutrim-agent-extensions = { workspace = true }
+krutrim-agent-backend = { workspace = true }
+krutrim-agent-celery-core = { workspace = true }
+krutrim-agent-celery = { workspace = true }
+
+[tool.ty.rules]
+invalid-return-type = "ignore"
+
+# Named indexes for the torch/torchvision cpu-vs-gpu accelerator switch (see
+# krutrim_agent_doc and krutrim_agent_celery's [project.optional-dependencies]).
+# Declared once here since uv resolves the whole workspace as one lockfile.
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[[tool.uv.index]]
+name = "pytorch-gpu"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+# krutrim-agent-celery's own cpu/gpu extras just forward to this pair (see
+# services/krutrim_agent_celery/pyproject.toml), so declaring the conflict
+# here once is enough — no separate torch/index config on celery itself.
+[tool.uv]
+conflicts = [
+    [
+        { package = "krutrim-agent-doc", extra = "cpu" },
+        { package = "krutrim-agent-doc", extra = "gpu" },
+    ],
+]
+
+[dependency-groups]
+# Virtual workspace root — no [project] table of its own (nothing lives
+# directly in backend/ anymore; see libs/ and services/). This dev group
+# exists so `uv run pytest` from backend/ has every workspace package plus
+# test tooling installed into one shared venv, since backend/tests/ isn't
+# itself a workspace member and needs to import across all five packages.
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "httpx>=0.28.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.16.2",
+    "vulture==2.16",
+    "krutrim-agent-utils",
+    "krutrim-agent-management",
+    "krutrim-agent-agui",
+    "krutrim-agent-sandbox",
+    "krutrim-agent-rag",
+    "krutrim-agent-doc",
+    "krutrim-agents-core",
+    "krutrim-agents",
+    "krutrim-agent-extensions",
+    # `[skills]` so the document-export helper's preferred converters are on
+    # hand for the test suite (it still has a stdlib fallback without them).
+    "krutrim-agent-backend[skills]",
+    "krutrim-agent-celery-core",
+    "krutrim-agent-celery",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+# ── Lint / format ──────────────────────────────────────────────────────
+# One config for the whole backend. ruff walks up to the nearest config, so
+# every `libs/*` and `services/*` package (none define their own [tool.ruff])
+# is linted by this. `ruff` is pinned in the dev group above, so run it via uv
+# from backend/:
+#   uv run ruff check .            # lint (report only)
+#   uv run ruff check --fix .      # lint + apply safe fixes
+#   uv run ruff format .           # reformat in place
+#   uv run ruff check . && uv run ruff format --check .   # CI / pre-commit gate
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+extend-exclude = ["**/.venv", "**/__pycache__", "scripts/**/__pycache__"]
+
+[tool.ruff.lint]
+# Bug-catching + safe modernization, light on pure style. Tune per taste.
+select = [
+    "E", "F", "W",   # pycodestyle + pyflakes
+    "I",             # import sorting
+    "B",             # bugbear — likely bugs
+    "UP",            # pyupgrade — safe syntax modernization
+    "C4",            # flake8-comprehensions
+    "PLE",           # pylint errors only (no style warnings)
+    "RUF",           # ruff-native rules (incl. unused noqa)
+    "ASYNC",         # blocking calls in async code
+    "BLE",           # blind `except:` — matches the repo's `# noqa: BLE001` convention
+    "S",             # flake8-bandit security checks
+    "T20",           # stray print()/pprint() in shipped code
+]
+ignore = [
+    "E501",     # line length — `ruff format` handles code; long comments/docstrings are fine
+    "B008",     # call in argument default — FastAPI Depends()/Query()/… idiom
+    "S101",     # assert — used deliberately (and allowed in tests below)
+    "S104",     # bind 0.0.0.0 — intentional for the dev server default
+    "S105", "S106",  # "possible hardcoded password" — too many false positives on kwargs
+    "RUF012",   # mutable class attrs without ClassVar — noisy with pydantic/dataclasses
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**"          = ["S", "T20", "BLE001", "ASYNC", "RUF"]
+"scripts/**"        = ["S", "T20"]
+# Skill helper scripts are run via the sandbox `execute` tool and read back
+# from stdout — `print` is their interface, and they shell out by design.
+"harness/skills/**" = ["S", "T20"]
+"**/conftest.py"    = ["E402"]
+
+[tool.ruff.lint.flake8-bugbear]
+# Callables that are safe to call in argument defaults (FastAPI dependency markers).
+extend-immutable-calls = [
+    "fastapi.Depends", "fastapi.Query", "fastapi.Path",
+    "fastapi.Header", "fastapi.Body", "fastapi.Form", "fastapi.File",
+]

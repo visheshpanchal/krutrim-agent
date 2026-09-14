@@ -1,0 +1,196 @@
+# PRODUCTION stack: frontend + backend + celery worker + redis, built from
+# each Dockerfile's `prod` target — immutable, no source mounted. For local
+# hot-reload dev use docker-compose.dev.yml instead. See docker/README.md.
+#
+# Env: repo-root .env (${VAR} interpolation, auto-loaded) + ../.env.prod
+# (env_file into backend/celery-worker, optional). Generate both with
+# `python3 -m scripts.generate_env prod` — see the root README.
+#
+#   docker compose -f docker/docker-compose.yml build
+#   docker compose -f docker/docker-compose.yml up -d
+
+# Override via COMPOSE_PROJECT_NAME to run an isolated second copy of the stack.
+name: ${COMPOSE_PROJECT_NAME:-krutrim-agent}
+
+services:
+
+  redis:
+    image: redis:8-alpine
+    ports:
+      - '6379:6379'
+    # Array form matters here: a plain string command gets whitespace-split,
+    # which silently DROPS a blank ${REDIS_PASSWORD} instead of passing it
+    # through as an empty argument — redis-server would then either error
+    # on a missing --requirepass value or misparse the next token as the
+    # password. The array form preserves "" exactly, which is how Redis
+    # itself represents "no password" (auth off, today's default).
+    command: ['redis-server', '--requirepass', '${REDIS_PASSWORD}']
+    volumes:
+      - krutrim-redis-data:/data
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: krutrim_qdrant
+    profiles: ["qdrant"]
+    volumes:
+      - krutrim-qdrant-data:/qdrant/storage
+    ports:
+      - "${QDRANT_HTTP_PORT:-6343}:6333"
+      - "${QDRANT_GRPC_PORT:-6344}:6334"
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  backend:
+    image: krutrim_agent-backend:latest
+    build:
+      context: ../backend
+      dockerfile: ../docker/backend.Dockerfile
+      target: prod
+      args:
+        # cpu (default) | gpu — see docker/backend.Dockerfile's TORCH_BACKEND
+        # header. gpu also needs the `deploy:` device reservation below.
+        TORCH_BACKEND: ${TORCH_BACKEND:-cpu}
+        # local (default) | other — only `local` pre-creates /data/krutrim_agent
+        # in the image (the volume mountpoint for storage/config).
+        KRUTRIM_AGENT_STORAGE_BACKEND: ${KRUTRIM_AGENT_STORAGE_BACKEND:-local}
+    env_file:
+      - path: ../.env.prod
+        required: false
+    environment:
+      KRUTRIM_AGENT_REDIS_URL: redis://${REDIS_PASSWORD:+$REDIS_USER:$REDIS_PASSWORD@}redis:6379/0
+      # Fixed in-container path, bind-mounted to the host's ~/.krutrim_agent
+      # (see volumes below) so storage/config live on the host, survive
+      # `docker compose down -v`, and stay browsable/editable. Literal path
+      # rather than ${HOME}-derived so it never depends on HOME being set
+      # inside the container. The celery-worker bind-mounts the same host dir
+      # at the same path for RAG ingestion.
+      KRUTRIM_AGENT_HOME_ROOT: /data/krutrim_agent
+      # Vector store: faisslite (default) or qdrant — a pure RUNTIME switch (no
+      # rebuild; both clients ship in the image). In .env.prod set
+      # KRUTRIM_AGENT_VECTOR_STORE_BACKEND=qdrant + COMPOSE_PROFILES=qdrant +
+      # KRUTRIM_AGENT_QDRANT_URL=http://qdrant:6333; they reach the container
+      # via env_file above.
+      OPENROUTER_API_KEY: ${LITELLM_MASTER_KEY:-${OPENROUTER_API_KEY:-NO_API_KEY}}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:+http://host.docker.internal:4000/}
+      TAVILY_SEARCH_API_BASE: ${TAVILY_SEARCH_API_BASE:+https://api.tavily.com}
+      LANGFUSE_BASE_URL: ${LANGFUSE_DOCKER_BASE_URL:-${LANGFUSE_BASE_URL:+http://host.docker.internal:3000}}
+    ports:
+      - '8000:8000'
+    volumes:
+      # Projects/sessions/workspaces + config.json / mcp.json / credentials.json
+      # / user.db / .jwt_secret (see krutrim_agent_management/local.py's
+      # HOME_ROOT layout). Host bind-mount: the data lives in the host's
+      # ~/.krutrim_agent, so it's directly inspectable and untouched by
+      # `docker compose down -v`. An unset $HOME fails the mount loudly rather
+      # than silently falling back to in-image space.
+      - ${HOME}/.krutrim_agent:/data/krutrim_agent
+      # Provider settings + per-run eval transcripts (gitignored, written
+      # at runtime).
+      - ../backend/harness/memory:/app/harness/memory
+    depends_on:
+      redis:
+        condition: service_started
+      # qdrant only exists when the "qdrant" profile is active — required:
+      # false keeps `docker compose up` working when it's not (e.g. the
+      # default faisslite backend), instead of erroring on an inactive
+      # service.
+      qdrant:
+        condition: service_started
+        required: false
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    # GPU (TORCH_BACKEND=gpu): uncomment to hand the container the host's
+    # NVIDIA GPUs (needs nvidia-container-toolkit on a CUDA linux/amd64 host).
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    restart: unless-stopped
+
+  celery-worker:
+    image: krutrim_agent-celery:latest
+    build:
+      context: ../backend
+      dockerfile: ../docker/celery.Dockerfile
+      target: prod
+      args:
+        # cpu (default) | gpu — see docker/celery.Dockerfile's TORCH_BACKEND
+        # header (cpu skips ~5GB of nvidia-* CUDA libs). gpu also needs the
+        # `deploy:` device reservation below.
+        TORCH_BACKEND: ${TORCH_BACKEND:-cpu}
+        # local (default) | other — only `local` pre-creates /data/krutrim_agent
+        # in the image (the volume mountpoint for storage/config).
+        KRUTRIM_AGENT_STORAGE_BACKEND: ${KRUTRIM_AGENT_STORAGE_BACKEND:-local}
+    env_file:
+      - path: ../.env.prod
+        required: false
+    environment:
+      KRUTRIM_AGENT_REDIS_URL: redis://${REDIS_PASSWORD:+$REDIS_USER:$REDIS_PASSWORD@}redis:6379/0
+      # Same fixed path + same host ~/.krutrim_agent bind-mount as `backend` —
+      # the RAG ingestion tasks read the same session workspaces the backend writes.
+      KRUTRIM_AGENT_HOME_ROOT: /data/krutrim_agent
+      LANGFUSE_BASE_URL: ${LANGFUSE_DOCKER_BASE_URL:-${LANGFUSE_BASE_URL:+http://host.docker.internal:3000}}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:+http://host.docker.internal:4000/}
+      OPENROUTER_API_KEY: ${LITELLM_MASTER_KEY:-${OPENROUTER_API_KEY:-NO_API_KEY}}
+    volumes:
+      - ${HOME}/.krutrim_agent:/data/krutrim_agent
+      - ../backend/harness/memory:/app/harness/memory
+    depends_on:
+      redis:
+        condition: service_started
+      qdrant:
+        condition: service_started
+        required: false
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    # GPU (TORCH_BACKEND=gpu) — the worker is the heavier CUDA user (docling).
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    restart: unless-stopped
+
+  frontend:
+    image: krutrim_agent-frontend:latest
+    build:
+      context: ..
+      dockerfile: docker/frontend.Dockerfile
+      target: prod
+      args:
+        VITE_BACKEND_URL: ${VITE_BACKEND_URL:-http://localhost:8000}
+    # Host 4200 -> 8080 in the container: the nginx-unprivileged base serves
+    # on 8080 as a non-root user (see frontend.Dockerfile / nginx.conf).
+    ports:
+      - '4200:8080'
+    depends_on:
+      - backend
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+volumes:
+  krutrim-redis-data:
+  krutrim-qdrant-data:
+  # NOTE: storage/config/workspaces are a host bind-mount of ~/.krutrim_agent
+  # (see backend + celery-worker volumes:), not a named volume.
+

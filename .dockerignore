@@ -1,0 +1,21 @@
+node_modules/
+dist/
+tmp/
+coverage/
+.nx/cache/
+.nx/workspace-data/
+*.tsbuildinfo
+
+backend/
+apps/desktop/
+
+# .gitignore
+.env
+.env.*
+!.env.example
+
+.git/
+.idea/
+.vscode/
+.DS_Store
+*.log

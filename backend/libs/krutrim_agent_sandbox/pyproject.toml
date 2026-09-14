@@ -1,0 +1,17 @@
+[project]
+name = "krutrim-agent-sandbox"
+version = "0.1.0"
+description = "Owner-scoped filesystem sandbox registry plus the job-status pub/sub channel."
+requires-python = ">=3.11"
+dependencies = [
+    "deepagents>=0.7.0",
+    "redis>=5.0.0",
+    "krutrim-agent-management",
+]
+
+[tool.uv.sources]
+krutrim-agent-management = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.12.0,<0.13.0"]
+build-backend = "uv_build"
