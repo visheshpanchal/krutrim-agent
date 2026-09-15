@@ -86,9 +86,7 @@ class SandboxRegistry:
         self._backends: dict[str, FilesystemBackend] = {}
         self._lock = threading.Lock()
 
-    async def resolve_owner_id(
-        self, user_id: str, session_id: str
-    ) -> tuple[str, str]:
+    async def resolve_owner_id(self, user_id: str, session_id: str) -> tuple[str, str]:
         """(1) An explicit `attached_to_session_id` wins — the session's
         sandbox actions resolve to that other session's workspace. (2)
         Otherwise the session is its own owner (isolated by default).

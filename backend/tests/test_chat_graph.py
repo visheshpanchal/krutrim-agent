@@ -25,7 +25,15 @@ def test_build_chat_graph_with_backend_adds_filesystem_tools(tmp_path):
     graph = build_chat_graph(_model(), backend=backend)
 
     tool_names = set(graph.nodes["tools"].bound.tools_by_name)
-    assert {"write_file", "read_file", "edit_file", "ls", "glob", "grep", "delete"} <= tool_names
+    assert {
+        "write_file",
+        "read_file",
+        "edit_file",
+        "ls",
+        "glob",
+        "grep",
+        "delete",
+    } <= tool_names
 
 
 def test_build_chat_graph_tools_param_still_merged_alongside_filesystem_tools(tmp_path):

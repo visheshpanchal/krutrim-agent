@@ -55,11 +55,13 @@ async def _make_session_with_files(files: dict[str, bytes]):
     tmp = Path(tempfile.mkdtemp())
     storage = LocalStorage(tmp)
     project = await storage.create_project(LOCAL_USER_ID, "P")
-    agent = await storage.create_agent(LOCAL_USER_ID, project.project_id, "research", "Test Agent")
+    agent = await storage.create_agent(
+        LOCAL_USER_ID, project.project_id, "research", "Test Agent"
+    )
     session = await storage.create_session(LOCAL_USER_ID, "agent", agent.agent_id)
     if files:
-        await storage.sync_workspace_from_container(LOCAL_USER_ID,
-            session.session_id, list(files.items())
+        await storage.sync_workspace_from_container(
+            LOCAL_USER_ID, session.session_id, list(files.items())
         )
     return storage, session.session_id
 
@@ -104,7 +106,11 @@ async def test_precompute_embeddings_empty_source_paths_creates_no_index():
     storage, session_id = await _make_session_with_files({})
 
     result = await precompute_embeddings_once(
-        storage, user_id=LOCAL_USER_ID, session_id=session_id, source_paths=[], embed_fn=_fake_embed
+        storage,
+        user_id=LOCAL_USER_ID,
+        session_id=session_id,
+        source_paths=[],
+        embed_fn=_fake_embed,
     )
 
     assert result == {"files_processed": 0, "chunks_added": 0}

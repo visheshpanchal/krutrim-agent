@@ -104,8 +104,7 @@ def test_list_models_returns_catalog(client):
     assert {"provider", "model", "display_name"} == set(payload[0])
     # the global default chat model is always offered
     assert any(
-        m["provider"] == "openrouter" and m["model"] == DEFAULT_MODEL
-        for m in payload
+        m["provider"] == "openrouter" and m["model"] == DEFAULT_MODEL for m in payload
     )
 
 
@@ -258,7 +257,9 @@ def _deliverable_fake_model_factory(_settings):
 
 
 def test_deliverable_marker_saves_file_and_is_downloadable(client, monkeypatch):
-    monkeypatch.setattr(chat_routes, "build_chat_model", _deliverable_fake_model_factory)
+    monkeypatch.setattr(
+        chat_routes, "build_chat_model", _deliverable_fake_model_factory
+    )
 
     result = send_chat(client, message="Analyze this in depth")
 

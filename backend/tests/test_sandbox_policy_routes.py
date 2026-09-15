@@ -43,7 +43,9 @@ def _create_session(client: TestClient, project_id: str) -> str:
     storage = client.app.state.storage
 
     async def _create():
-        agent = await storage.create_agent(LOCAL_USER_ID, project_id, "research", "Test Agent")
+        agent = await storage.create_agent(
+            LOCAL_USER_ID, project_id, "research", "Test Agent"
+        )
         session = await storage.create_session(LOCAL_USER_ID, "agent", agent.agent_id)
         return session.session_id
 

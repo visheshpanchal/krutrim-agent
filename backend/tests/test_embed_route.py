@@ -47,7 +47,9 @@ def _create_session(client: TestClient) -> str:
 
     async def _create():
         project = await storage.create_project(LOCAL_USER_ID, "P")
-        agent = await storage.create_agent(LOCAL_USER_ID, project.project_id, "research", "Test Agent")
+        agent = await storage.create_agent(
+            LOCAL_USER_ID, project.project_id, "research", "Test Agent"
+        )
         session = await storage.create_session(LOCAL_USER_ID, "agent", agent.agent_id)
         return session.session_id
 
@@ -82,8 +84,8 @@ def test_embed_without_source_paths_defaults_to_workspace_mirror(client):
     session_id = _create_session(client)
     storage = client.app.state.storage
     asyncio.run(
-        storage.sync_workspace_from_container(LOCAL_USER_ID,
-            session_id, [("a.txt", b"x"), ("b.txt", b"y")]
+        storage.sync_workspace_from_container(
+            LOCAL_USER_ID, session_id, [("a.txt", b"x"), ("b.txt", b"y")]
         )
     )
 
@@ -128,7 +130,9 @@ def test_rag_text_dispatches_process_rag_document_task(client):
 
     storage = client.app.state.storage
     written = asyncio.run(
-        storage.read_workspace_file(LOCAL_USER_ID, session_id, f"_rag_uploads/{document_id}.txt")
+        storage.read_workspace_file(
+            LOCAL_USER_ID, session_id, f"_rag_uploads/{document_id}.txt"
+        )
     )
     assert written == b"some pasted research notes"
 

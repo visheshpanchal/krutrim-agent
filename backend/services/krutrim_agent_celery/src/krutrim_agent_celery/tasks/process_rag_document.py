@@ -196,8 +196,12 @@ def process_rag_document(
             # actual ingestion job.
             try:
                 publish_job_stage_progress(pubsub, job_id, stage, processed, total)
-            except Exception:  # noqa: BLE001
-                pass
+            except Exception as exc:  # noqa: BLE001
+                logger.debug(
+                    "process_rag_document[{}]: progress publish failed: {}",
+                    document_id,
+                    exc,
+                )
 
         result = asyncio.run(
             process_rag_document_once(
@@ -220,8 +224,12 @@ def process_rag_document(
                 publish_job_error(
                     pubsub, job_id, result.get("error", "Ingestion failed.")
                 )
-            except Exception:  # noqa: BLE001 - best-effort, same as on_progress above
-                pass
+            except Exception as exc:  # noqa: BLE001 - best-effort, same as on_progress above
+                logger.debug(
+                    "process_rag_document[{}]: error publish failed: {}",
+                    document_id,
+                    exc,
+                )
         else:
             logger.info(
                 "process_rag_document[{}]: done ({} chunk(s) added)",

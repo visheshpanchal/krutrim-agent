@@ -111,7 +111,9 @@ def test_malformed_config_file_falls_back_to_defaults(tmp_path, bad):
 def test_out_of_range_value_in_file_falls_back_without_raising(tmp_path):
     _seed_config_file(tmp_path, '{"context_keep_messages": -3}')
     s = _app_settings(tmp_path)
-    assert s.user_settings(U).context_keep_messages == UserSettings().context_keep_messages
+    assert (
+        s.user_settings(U).context_keep_messages == UserSettings().context_keep_messages
+    )
 
 
 def test_unknown_key_in_file_is_ignored(tmp_path):
@@ -187,7 +189,9 @@ def test_reset_user_all_restores_pure_defaults(tmp_path):
 # ── user_settings_schema (the settings-form descriptor) ──────────────
 def test_user_settings_schema_describes_every_field(tmp_path):
     s = _app_settings(tmp_path)
-    s.reset_user(U)  # pin the file to built-in defaults so current_value is env-independent
+    s.reset_user(
+        U
+    )  # pin the file to built-in defaults so current_value is env-independent
     schema = s.user_settings_schema(U)
     assert set(schema) == USER_KEYS
 

@@ -12,7 +12,7 @@ from krutrim_agent_doc.registry import DocumentParserRegistry, UnsupportedDocume
 
 
 def test_plain_text_parser_decodes_utf8():
-    result = PlainTextParser().parse("hello world".encode(), file_name="notes.txt")
+    result = PlainTextParser().parse(b"hello world", file_name="notes.txt")
     assert result.success is True
     assert result.text == "hello world"
 

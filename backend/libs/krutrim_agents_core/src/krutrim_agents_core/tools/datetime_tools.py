@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from langchain_core.tools import tool
 
@@ -25,6 +25,6 @@ def datetime_tool(timezone: str | None = None) -> str:
     """
     try:
         tz = _resolve_timezone(timezone)
-    except Exception:
+    except (ZoneInfoNotFoundError, ValueError):
         return f"Error: unknown timezone '{timezone}'"
     return datetime.now(tz).isoformat()

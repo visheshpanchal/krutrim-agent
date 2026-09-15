@@ -45,5 +45,5 @@ __all__ = [
     "UserRecord",
     "UsernameTakenError",
     "create_auth_storage",
-    "create_storage"
+    "create_storage",
 ]

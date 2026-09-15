@@ -15,20 +15,26 @@ async def _seed(storage: LocalStorage):
     """Two projects, each with an agent + session, so leak checks have something
     to leak."""
     p1 = await storage.create_project(LOCAL_USER_ID, "Target project")
-    a1 = await storage.create_agent(LOCAL_USER_ID, p1.project_id, "research", "Target agent")
+    a1 = await storage.create_agent(
+        LOCAL_USER_ID, p1.project_id, "research", "Target agent"
+    )
     s1 = await storage.create_session(LOCAL_USER_ID, "agent", a1.agent_id)
 
     p2 = await storage.create_project(LOCAL_USER_ID, "Other project")
-    a2 = await storage.create_agent(LOCAL_USER_ID, p2.project_id, "research", "Other agent")
+    a2 = await storage.create_agent(
+        LOCAL_USER_ID, p2.project_id, "research", "Other agent"
+    )
     s2 = await storage.create_session(LOCAL_USER_ID, "agent", a2.agent_id)
 
     await storage.write_memory(LOCAL_USER_ID, p1.project_id, "target memory")
-    await storage.write_memory(LOCAL_USER_ID, p2.project_id, "SECRET other-project memory")
-    await storage.sync_workspace_from_container(LOCAL_USER_ID,
-        s1.session_id, [("notes.md", b"# target notes")]
+    await storage.write_memory(
+        LOCAL_USER_ID, p2.project_id, "SECRET other-project memory"
     )
-    await storage.sync_workspace_from_container(LOCAL_USER_ID,
-        s2.session_id, [("notes.md", b"other notes")]
+    await storage.sync_workspace_from_container(
+        LOCAL_USER_ID, s1.session_id, [("notes.md", b"# target notes")]
+    )
+    await storage.sync_workspace_from_container(
+        LOCAL_USER_ID, s2.session_id, [("notes.md", b"other notes")]
     )
     return p1, a1, s1, p2, a2, s2
 
@@ -38,7 +44,9 @@ async def test_export_scope_contains_only_the_target(tmp_path):
     p1, a1, s1, p2, a2, s2 = await _seed(storage)
 
     staging = tmp_path / "staging"
-    await storage.export_scope(LOCAL_USER_ID, p1.project_id, a1.agent_id, s1.session_id, staging)
+    await storage.export_scope(
+        LOCAL_USER_ID, p1.project_id, a1.agent_id, s1.session_id, staging
+    )
 
     store = staging / "store"
     projects = (
@@ -77,12 +85,20 @@ async def test_export_scope_reopenable_as_storage(tmp_path):
     p1, a1, s1, *_ = await _seed(storage)
 
     staging = tmp_path / "staging"
-    await storage.export_scope(LOCAL_USER_ID, p1.project_id, a1.agent_id, s1.session_id, staging)
+    await storage.export_scope(
+        LOCAL_USER_ID, p1.project_id, a1.agent_id, s1.session_id, staging
+    )
 
     reopened = LocalStorage(staging / "store")
-    assert (await reopened.get_project(LOCAL_USER_ID, p1.project_id)).project_title == "Target project"
-    assert (await reopened.get_agent(LOCAL_USER_ID, a1.agent_id)).display_name == "Target agent"
-    assert (await reopened.get_session(LOCAL_USER_ID, s1.session_id)).session_id == s1.session_id
+    assert (
+        await reopened.get_project(LOCAL_USER_ID, p1.project_id)
+    ).project_title == "Target project"
+    assert (
+        await reopened.get_agent(LOCAL_USER_ID, a1.agent_id)
+    ).display_name == "Target agent"
+    assert (
+        await reopened.get_session(LOCAL_USER_ID, s1.session_id)
+    ).session_id == s1.session_id
     assert await reopened.read_memory(LOCAL_USER_ID, p1.project_id) == "target memory"
 
 
@@ -90,12 +106,12 @@ async def test_export_scope_rejects_mismatched_chain(tmp_path):
     storage = LocalStorage(tmp_path / "store")
     p1, a1, s1, p2, a2, s2 = await _seed(storage)
     with pytest.raises(KeyError):
-        await storage.export_scope(LOCAL_USER_ID,
-            p1.project_id, a1.agent_id, s2.session_id, tmp_path / "x"
+        await storage.export_scope(
+            LOCAL_USER_ID, p1.project_id, a1.agent_id, s2.session_id, tmp_path / "x"
         )
     with pytest.raises(KeyError):
-        await storage.export_scope(LOCAL_USER_ID,
-            p2.project_id, a1.agent_id, s1.session_id, tmp_path / "y"
+        await storage.export_scope(
+            LOCAL_USER_ID, p2.project_id, a1.agent_id, s1.session_id, tmp_path / "y"
         )
 
 
@@ -104,7 +120,9 @@ async def test_import_scope_round_trips_out_dir(tmp_path):
     p1, a1, s1, *_ = await _seed(storage)
 
     staging = tmp_path / "staging"
-    await storage.export_scope(LOCAL_USER_ID, p1.project_id, a1.agent_id, s1.session_id, staging)
+    await storage.export_scope(
+        LOCAL_USER_ID, p1.project_id, a1.agent_id, s1.session_id, staging
+    )
 
     # simulate the container's writes
     (staging / "workspace" / "report.md").write_bytes(b"# final report")
@@ -137,7 +155,9 @@ async def test_import_scope_merges_run_log_with_host_side_lines(tmp_path):
     )
 
     staging = tmp_path / "staging"
-    await storage.export_scope(LOCAL_USER_ID, p1.project_id, a1.agent_id, s1.session_id, staging)
+    await storage.export_scope(
+        LOCAL_USER_ID, p1.project_id, a1.agent_id, s1.session_id, staging
+    )
     (staging / "out" / "runs").mkdir(parents=True)
     (staging / "out" / "runs" / f"{s1.session_id}.jsonl").write_text(
         '{"source": "agent_runtime", "type": "RUN_STARTED"}\n'

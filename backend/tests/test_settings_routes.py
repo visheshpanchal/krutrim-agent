@@ -74,14 +74,10 @@ def test_non_catalog_model_rejected_unless_custom(client):
     agent = asyncio.run(_make_agent(client.app.state.storage))
     url = f"/api/providers/agents/{agent.agent_id}/main"
 
-    rejected = client.put(
-        url, json={"model_id": "openrouter:made-up/model"}
-    )
+    rejected = client.put(url, json={"model_id": "openrouter:made-up/model"})
     assert rejected.status_code == 422
 
-    ok = client.put(
-        url, json={"model_id": "openrouter:made-up/model", "custom": True}
-    )
+    ok = client.put(url, json={"model_id": "openrouter:made-up/model", "custom": True})
     assert ok.status_code == 200
     main = next(r for r in ok.json()["roles"] if r["role"] == "main")
     assert main["settings"]["model"] == "made-up/model"

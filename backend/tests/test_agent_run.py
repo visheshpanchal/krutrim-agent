@@ -94,7 +94,9 @@ async def test_get_or_create_run_session_rejects_session_from_other_agent(tmp_pa
     foreign_session = await storage.create_session(U, "agent", agent_b.agent_id)
 
     with pytest.raises(HTTPException) as exc_info:
-        await _get_or_create_run_session(storage, U, agent_a, foreign_session.session_id)
+        await _get_or_create_run_session(
+            storage, U, agent_a, foreign_session.session_id
+        )
     assert exc_info.value.status_code == 400
 
 

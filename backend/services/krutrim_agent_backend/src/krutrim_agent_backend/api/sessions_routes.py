@@ -128,9 +128,7 @@ def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
-async def _get_session(
-    storage: Storage, user_id: str, session_id: str
-) -> SessionInfo:
+async def _get_session(storage: Storage, user_id: str, session_id: str) -> SessionInfo:
     try:
         return await storage.get_session(user_id, session_id)
     except KeyError as exc:
@@ -333,9 +331,7 @@ async def update_session_sandbox_policy(
         # "no chaining" invariant, guarded from the other direction.
         dependents = [
             s.session_id
-            for s in await _list_project_sessions(
-                storage, user_id, current.project_id
-            )
+            for s in await _list_project_sessions(storage, user_id, current.project_id)
             if s.attached_to_session_id == session_id
         ]
         if dependents:
