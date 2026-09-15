@@ -45,7 +45,9 @@ async def test_list_projects(tmp_path):
 async def test_update_project_partial_update(tmp_path):
     storage = LocalStorage(tmp_path)
     project = await storage.create_project(LOCAL_USER_ID, "Original", "orig info")
-    updated = await storage.update_project(LOCAL_USER_ID, project.project_id, project_title="Renamed")
+    updated = await storage.update_project(
+        LOCAL_USER_ID, project.project_id, project_title="Renamed"
+    )
     assert updated.project_title == "Renamed"
     assert updated.project_information == "orig info"  # untouched
 
@@ -66,8 +68,8 @@ async def test_delete_project_removes_row_and_dir(tmp_path):
 async def test_create_agent_row(tmp_path):
     storage = LocalStorage(tmp_path)
     project = await storage.create_project(LOCAL_USER_ID, "P")
-    agent = await storage.create_agent(LOCAL_USER_ID,
-        project.project_id, "research", "Business Analysis"
+    agent = await storage.create_agent(
+        LOCAL_USER_ID, project.project_id, "research", "Business Analysis"
     )
     assert agent.project_id == project.project_id
     assert agent.agent_key == "research"
@@ -88,22 +90,29 @@ async def test_list_agents_scoped_to_project(tmp_path):
     await storage.create_agent(LOCAL_USER_ID, project_a.project_id, "research", "A2")
 
     assert {
-        a.display_name for a in await storage.list_agents(LOCAL_USER_ID, project_a.project_id)
+        a.display_name
+        for a in await storage.list_agents(LOCAL_USER_ID, project_a.project_id)
     } == {"A1", "A2"}
 
 
 async def test_update_agent_renames(tmp_path):
     storage = LocalStorage(tmp_path)
     project = await storage.create_project(LOCAL_USER_ID, "P")
-    agent = await storage.create_agent(LOCAL_USER_ID, project.project_id, "research", "Original")
-    updated = await storage.update_agent(LOCAL_USER_ID, agent.agent_id, display_name="Renamed")
+    agent = await storage.create_agent(
+        LOCAL_USER_ID, project.project_id, "research", "Original"
+    )
+    updated = await storage.update_agent(
+        LOCAL_USER_ID, agent.agent_id, display_name="Renamed"
+    )
     assert updated.display_name == "Renamed"
 
 
 async def test_delete_agent_cascades_sessions(tmp_path):
     storage = LocalStorage(tmp_path)
     project = await storage.create_project(LOCAL_USER_ID, "P")
-    agent = await storage.create_agent(LOCAL_USER_ID, project.project_id, "research", "A")
+    agent = await storage.create_agent(
+        LOCAL_USER_ID, project.project_id, "research", "A"
+    )
     session = await storage.create_session(LOCAL_USER_ID, "agent", agent.agent_id)
 
     await storage.delete_agent(LOCAL_USER_ID, agent.agent_id)
@@ -117,7 +126,9 @@ async def test_delete_agent_cascades_sessions(tmp_path):
 async def test_delete_project_cascades_agents_and_their_sessions(tmp_path):
     storage = LocalStorage(tmp_path)
     project = await storage.create_project(LOCAL_USER_ID, "P")
-    agent = await storage.create_agent(LOCAL_USER_ID, project.project_id, "research", "A")
+    agent = await storage.create_agent(
+        LOCAL_USER_ID, project.project_id, "research", "A"
+    )
     session = await storage.create_session(LOCAL_USER_ID, "agent", agent.agent_id)
 
     await storage.delete_project(LOCAL_USER_ID, project.project_id)
@@ -133,8 +144,8 @@ async def test_delete_project_cascades_agents_and_their_sessions(tmp_path):
 
 async def test_create_standalone_chat(tmp_path):
     storage = LocalStorage(tmp_path)
-    chat = await storage.create_chat(LOCAL_USER_ID,
-        "General", "openrouter", "deepseek/deepseek-v4-flash-0731"
+    chat = await storage.create_chat(
+        LOCAL_USER_ID, "General", "openrouter", "deepseek/deepseek-v4-flash-0731"
     )
     assert chat.project_id is None
     assert chat.display_name == "General"
@@ -143,7 +154,8 @@ async def test_create_standalone_chat(tmp_path):
 async def test_create_project_scoped_chat(tmp_path):
     storage = LocalStorage(tmp_path)
     project = await storage.create_project(LOCAL_USER_ID, "P")
-    chat = await storage.create_chat(LOCAL_USER_ID,
+    chat = await storage.create_chat(
+        LOCAL_USER_ID,
         "Q&A",
         "openrouter",
         "deepseek/deepseek-v4-flash-0731",
@@ -155,21 +167,26 @@ async def test_create_project_scoped_chat(tmp_path):
 async def test_create_chat_for_unknown_project_raises(tmp_path):
     storage = LocalStorage(tmp_path)
     with pytest.raises(KeyError):
-        await storage.create_chat(LOCAL_USER_ID, "X", "openrouter", "m", project_id="nope")
+        await storage.create_chat(
+            LOCAL_USER_ID, "X", "openrouter", "m", project_id="nope"
+        )
 
 
 async def test_list_chats_standalone_vs_project_scoped(tmp_path):
     storage = LocalStorage(tmp_path)
     project = await storage.create_project(LOCAL_USER_ID, "P")
     await storage.create_chat(LOCAL_USER_ID, "Standalone", "openrouter", "m")
-    await storage.create_chat(LOCAL_USER_ID,
-        "Scoped", "openrouter", "m", project_id=project.project_id
+    await storage.create_chat(
+        LOCAL_USER_ID, "Scoped", "openrouter", "m", project_id=project.project_id
     )
 
-    assert {c.display_name for c in await storage.list_chats(LOCAL_USER_ID, None)} == {"Standalone"}
-    assert {c.display_name for c in await storage.list_chats(LOCAL_USER_ID, project.project_id)} == {
-        "Scoped"
+    assert {c.display_name for c in await storage.list_chats(LOCAL_USER_ID, None)} == {
+        "Standalone"
     }
+    assert {
+        c.display_name
+        for c in await storage.list_chats(LOCAL_USER_ID, project.project_id)
+    } == {"Scoped"}
 
 
 async def test_move_chat_into_and_out_of_project(tmp_path):
@@ -179,7 +196,9 @@ async def test_move_chat_into_and_out_of_project(tmp_path):
     session = await storage.create_session(LOCAL_USER_ID, "chat", chat.chat_id)
     assert session.project_id is None
 
-    moved = await storage.move_chat(LOCAL_USER_ID, chat.chat_id, project_id=project.project_id)
+    moved = await storage.move_chat(
+        LOCAL_USER_ID, chat.chat_id, project_id=project.project_id
+    )
     assert moved.project_id == project.project_id
     # Sessions already under the chat are re-scoped to the new project too.
     assert (
@@ -188,7 +207,9 @@ async def test_move_chat_into_and_out_of_project(tmp_path):
 
     detached = await storage.move_chat(LOCAL_USER_ID, chat.chat_id, project_id=None)
     assert detached.project_id is None
-    assert (await storage.get_session(LOCAL_USER_ID, session.session_id)).project_id is None
+    assert (
+        await storage.get_session(LOCAL_USER_ID, session.session_id)
+    ).project_id is None
 
 
 async def test_move_chat_unknown_target_project_raises(tmp_path):
@@ -214,8 +235,8 @@ async def test_delete_chat_cascades_sessions(tmp_path):
 async def test_delete_project_cascades_chats_and_their_sessions(tmp_path):
     storage = LocalStorage(tmp_path)
     project = await storage.create_project(LOCAL_USER_ID, "P")
-    chat = await storage.create_chat(LOCAL_USER_ID,
-        "C", "openrouter", "m", project_id=project.project_id
+    chat = await storage.create_chat(
+        LOCAL_USER_ID, "C", "openrouter", "m", project_id=project.project_id
     )
     session = await storage.create_session(LOCAL_USER_ID, "chat", chat.chat_id)
 
@@ -234,9 +255,12 @@ async def test_memory_roundtrip(tmp_path):
     storage = LocalStorage(tmp_path)
     project = await storage.create_project(LOCAL_USER_ID, "Mem test")
     assert await storage.read_memory(LOCAL_USER_ID, project.project_id) == ""
-    await storage.write_memory(LOCAL_USER_ID, project.project_id, "# Memory\nlearned something")
+    await storage.write_memory(
+        LOCAL_USER_ID, project.project_id, "# Memory\nlearned something"
+    )
     assert (
-        await storage.read_memory(LOCAL_USER_ID, project.project_id) == "# Memory\nlearned something"
+        await storage.read_memory(LOCAL_USER_ID, project.project_id)
+        == "# Memory\nlearned something"
     )
 
 
@@ -252,14 +276,17 @@ async def test_memory_for_unknown_project_raises(tmp_path):
 async def test_session_lifecycle_under_agent(tmp_path):
     storage = LocalStorage(tmp_path)
     project = await storage.create_project(LOCAL_USER_ID, "Sessions")
-    agent = await storage.create_agent(LOCAL_USER_ID, project.project_id, "research", "A")
+    agent = await storage.create_agent(
+        LOCAL_USER_ID, project.project_id, "research", "A"
+    )
     session = await storage.create_session(LOCAL_USER_ID, "agent", agent.agent_id)
     assert session.owner_type == "agent"
     assert session.owner_id == agent.agent_id
     assert session.project_id == project.project_id
     assert await storage.get_session(LOCAL_USER_ID, session.session_id) == session
     assert [
-        s.session_id for s in await storage.list_sessions(LOCAL_USER_ID, "agent", agent.agent_id)
+        s.session_id
+        for s in await storage.list_sessions(LOCAL_USER_ID, "agent", agent.agent_id)
     ] == [session.session_id]
     await storage.delete_session(LOCAL_USER_ID, session.session_id)
     with pytest.raises(KeyError):
@@ -284,8 +311,8 @@ async def test_update_session_renames(tmp_path):
     storage = LocalStorage(tmp_path)
     chat = await storage.create_chat(LOCAL_USER_ID, "C", "openrouter", "m")
     session = await storage.create_session(LOCAL_USER_ID, "chat", chat.chat_id)
-    updated = await storage.update_session(LOCAL_USER_ID,
-        session.session_id, display_name="Scoped run"
+    updated = await storage.update_session(
+        LOCAL_USER_ID, session.session_id, display_name="Scoped run"
     )
     assert updated.display_name == "Scoped run"
 
@@ -338,8 +365,12 @@ async def test_reopening_storage_preserves_data(tmp_path):
     await storage.write_memory(LOCAL_USER_ID, project.project_id, "remember me")
 
     reopened = LocalStorage(tmp_path)
-    assert (await reopened.get_project(LOCAL_USER_ID, project.project_id)).project_title == "Persisted"
-    assert await reopened.read_memory(LOCAL_USER_ID, project.project_id) == "remember me"
+    assert (
+        await reopened.get_project(LOCAL_USER_ID, project.project_id)
+    ).project_title == "Persisted"
+    assert (
+        await reopened.read_memory(LOCAL_USER_ID, project.project_id) == "remember me"
+    )
 
 
 # -- sandbox sharing policy ------------------------------------------------
@@ -348,7 +379,9 @@ async def test_reopening_storage_preserves_data(tmp_path):
 async def test_new_project_and_session_default_to_isolated(tmp_path):
     storage = LocalStorage(tmp_path)
     project = await storage.create_project(LOCAL_USER_ID, "Defaults")
-    agent = await storage.create_agent(LOCAL_USER_ID, project.project_id, "research", "A")
+    agent = await storage.create_agent(
+        LOCAL_USER_ID, project.project_id, "research", "A"
+    )
     session = await storage.create_session(LOCAL_USER_ID, "agent", agent.agent_id)
     assert project.sandbox_sharing == "isolated"
     assert project.sandbox_idle_timeout_seconds is None
@@ -362,15 +395,18 @@ async def test_new_project_and_session_default_to_isolated(tmp_path):
 async def test_update_project_sandbox_policy_partial_update(tmp_path):
     storage = LocalStorage(tmp_path)
     project = await storage.create_project(LOCAL_USER_ID, "Policy")
-    updated = await storage.update_project_sandbox_policy(LOCAL_USER_ID,
-        project.project_id, sharing="project-shared", idle_timeout_seconds=120
+    updated = await storage.update_project_sandbox_policy(
+        LOCAL_USER_ID,
+        project.project_id,
+        sharing="project-shared",
+        idle_timeout_seconds=120,
     )
     assert updated.sandbox_sharing == "project-shared"
     assert updated.sandbox_idle_timeout_seconds == 120
     assert updated.sandbox_resource_overrides is None  # untouched
 
-    with_overrides = await storage.update_project_sandbox_policy(LOCAL_USER_ID,
-        project.project_id, resource_overrides={"memory_mb": 1024}
+    with_overrides = await storage.update_project_sandbox_policy(
+        LOCAL_USER_ID, project.project_id, resource_overrides={"memory_mb": 1024}
     )
     assert with_overrides.sandbox_sharing == "project-shared"  # untouched by this call
     assert with_overrides.sandbox_resource_overrides == {"memory_mb": 1024}
@@ -379,15 +415,19 @@ async def test_update_project_sandbox_policy_partial_update(tmp_path):
 async def test_update_project_sandbox_policy_unknown_project_raises(tmp_path):
     storage = LocalStorage(tmp_path)
     with pytest.raises(KeyError):
-        await storage.update_project_sandbox_policy(LOCAL_USER_ID, "nope", sharing="isolated")
+        await storage.update_project_sandbox_policy(
+            LOCAL_USER_ID, "nope", sharing="isolated"
+        )
 
 
 async def test_update_agent_sandbox_policy_roundtrip(tmp_path):
     storage = LocalStorage(tmp_path)
     project = await storage.create_project(LOCAL_USER_ID, "P")
-    agent = await storage.create_agent(LOCAL_USER_ID, project.project_id, "research", "A")
-    updated = await storage.update_agent_sandbox_policy(LOCAL_USER_ID,
-        agent.agent_id, sharing="project-shared"
+    agent = await storage.create_agent(
+        LOCAL_USER_ID, project.project_id, "research", "A"
+    )
+    updated = await storage.update_agent_sandbox_policy(
+        LOCAL_USER_ID, agent.agent_id, sharing="project-shared"
     )
     assert updated.sandbox_sharing == "project-shared"
 
@@ -395,8 +435,8 @@ async def test_update_agent_sandbox_policy_roundtrip(tmp_path):
 async def test_update_chat_sandbox_policy_roundtrip(tmp_path):
     storage = LocalStorage(tmp_path)
     chat = await storage.create_chat(LOCAL_USER_ID, "C", "openrouter", "m")
-    updated = await storage.update_chat_sandbox_policy(LOCAL_USER_ID,
-        chat.chat_id, sharing="project-shared"
+    updated = await storage.update_chat_sandbox_policy(
+        LOCAL_USER_ID, chat.chat_id, sharing="project-shared"
     )
     assert (
         updated.sandbox_sharing == "project-shared"
@@ -406,17 +446,20 @@ async def test_update_chat_sandbox_policy_roundtrip(tmp_path):
 async def test_update_session_sandbox_policy_roundtrip(tmp_path):
     storage = LocalStorage(tmp_path)
     project = await storage.create_project(LOCAL_USER_ID, "Session Policy")
-    agent = await storage.create_agent(LOCAL_USER_ID, project.project_id, "research", "A")
+    agent = await storage.create_agent(
+        LOCAL_USER_ID, project.project_id, "research", "A"
+    )
     session_a = await storage.create_session(LOCAL_USER_ID, "agent", agent.agent_id)
     session_b = await storage.create_session(LOCAL_USER_ID, "agent", agent.agent_id)
 
-    updated = await storage.update_session_sandbox_policy(LOCAL_USER_ID,
-        session_a.session_id, attached_to_session_id=session_b.session_id
+    updated = await storage.update_session_sandbox_policy(
+        LOCAL_USER_ID, session_a.session_id, attached_to_session_id=session_b.session_id
     )
     assert updated.attached_to_session_id == session_b.session_id
     assert updated.sandbox_sharing == "isolated"  # untouched
 
-    linked = await storage.update_session_sandbox_policy(LOCAL_USER_ID,
+    linked = await storage.update_session_sandbox_policy(
+        LOCAL_USER_ID,
         session_a.session_id,
         sharing="session-shared",
         linked_session_ids=[session_b.session_id],
@@ -431,7 +474,9 @@ async def test_update_session_sandbox_policy_roundtrip(tmp_path):
 async def test_update_session_sandbox_policy_unknown_raises(tmp_path):
     storage = LocalStorage(tmp_path)
     with pytest.raises(KeyError):
-        await storage.update_session_sandbox_policy(LOCAL_USER_ID, "nope", sharing="isolated")
+        await storage.update_session_sandbox_policy(
+            LOCAL_USER_ID, "nope", sharing="isolated"
+        )
 
 
 # -- session workspace -------------------------------------------------------
@@ -442,7 +487,12 @@ async def test_workspace_files_empty_for_fresh_session(tmp_path):
     chat = await storage.create_chat(LOCAL_USER_ID, "C", "openrouter", "m")
     session = await storage.create_session(LOCAL_USER_ID, "chat", chat.chat_id)
     assert await storage.read_workspace_files(LOCAL_USER_ID, session.session_id) == []
-    assert await storage.read_workspace_file(LOCAL_USER_ID, session.session_id, "missing.txt") is None
+    assert (
+        await storage.read_workspace_file(
+            LOCAL_USER_ID, session.session_id, "missing.txt"
+        )
+        is None
+    )
 
 
 async def test_sync_workspace_from_container_then_read(tmp_path):
@@ -450,14 +500,19 @@ async def test_sync_workspace_from_container_then_read(tmp_path):
     chat = await storage.create_chat(LOCAL_USER_ID, "C", "openrouter", "m")
     session = await storage.create_session(LOCAL_USER_ID, "chat", chat.chat_id)
 
-    await storage.sync_workspace_from_container(LOCAL_USER_ID,
-        session.session_id, [("notes.txt", b"hello"), ("sub/data.json", b'{"a": 1}')]
+    await storage.sync_workspace_from_container(
+        LOCAL_USER_ID,
+        session.session_id,
+        [("notes.txt", b"hello"), ("sub/data.json", b'{"a": 1}')],
     )
 
     files = await storage.read_workspace_files(LOCAL_USER_ID, session.session_id)
     assert sorted(files) == ["notes.txt", "sub/data.json"]
     assert (
-        await storage.read_workspace_file(LOCAL_USER_ID, session.session_id, "notes.txt") == b"hello"
+        await storage.read_workspace_file(
+            LOCAL_USER_ID, session.session_id, "notes.txt"
+        )
+        == b"hello"
     )
 
 
@@ -470,13 +525,15 @@ async def test_workspace_methods_for_unknown_session_raise(tmp_path):
 async def test_reopening_storage_preserves_sandbox_policy(tmp_path):
     storage = LocalStorage(tmp_path)
     project = await storage.create_project(LOCAL_USER_ID, "Persisted Policy")
-    await storage.update_project_sandbox_policy(LOCAL_USER_ID,
-        project.project_id, sharing="project-shared"
+    await storage.update_project_sandbox_policy(
+        LOCAL_USER_ID, project.project_id, sharing="project-shared"
     )
-    agent = await storage.create_agent(LOCAL_USER_ID, project.project_id, "research", "A")
+    agent = await storage.create_agent(
+        LOCAL_USER_ID, project.project_id, "research", "A"
+    )
     session = await storage.create_session(LOCAL_USER_ID, "agent", agent.agent_id)
-    await storage.update_session_sandbox_policy(LOCAL_USER_ID,
-        session.session_id, linked_session_ids=["peer-1"]
+    await storage.update_session_sandbox_policy(
+        LOCAL_USER_ID, session.session_id, linked_session_ids=["peer-1"]
     )
 
     reopened = LocalStorage(tmp_path)

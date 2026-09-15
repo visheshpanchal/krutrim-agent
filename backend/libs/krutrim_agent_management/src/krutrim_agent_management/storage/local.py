@@ -528,7 +528,9 @@ class _LocalStorageImpl:
         project_id: str | None = None,
     ) -> Chat:
         if project_id is not None:
-            self.get_project(user_id, project_id)  # KeyError if unknown / not this user's
+            self.get_project(
+                user_id, project_id
+            )  # KeyError if unknown / not this user's
         chat_id = str(uuid.uuid4())
         now = _now_iso()
         with self._chats_db_lock, self._connect(self._chats_db_path) as conn:
@@ -989,7 +991,8 @@ class _LocalStorageImpl:
         caller input."""
         with _LocalStorageImpl._connect(src_db) as src:
             row = src.execute(
-                f"SELECT * FROM {table} WHERE {id_col} = ?", (id_val,)
+                f"SELECT * FROM {table} WHERE {id_col} = ?",  # noqa: S608 - table/id_col are module-internal constants
+                (id_val,),
             ).fetchone()
         if row is None:
             raise KeyError(f"{table}.{id_col}={id_val!r} not found for scope export")
@@ -998,7 +1001,7 @@ class _LocalStorageImpl:
         placeholders = ", ".join("?" for _ in cols)
         with _LocalStorageImpl._connect(dst_db) as dst:
             dst.execute(
-                f"INSERT OR REPLACE INTO {table} ({collist}) VALUES ({placeholders})",
+                f"INSERT OR REPLACE INTO {table} ({collist}) VALUES ({placeholders})",  # noqa: S608 - table/collist are module-internal constants
                 tuple(row[c] for c in cols),
             )
 
@@ -1334,9 +1337,7 @@ class LocalStorage(Storage):
     async def read_memory(self, user_id: str, project_id: str) -> str:
         return await asyncio.to_thread(self._impl.read_memory, user_id, project_id)
 
-    async def write_memory(
-        self, user_id: str, project_id: str, content: str
-    ) -> None:
+    async def write_memory(self, user_id: str, project_id: str, content: str) -> None:
         return await asyncio.to_thread(
             self._impl.write_memory, user_id, project_id, content
         )
@@ -1483,11 +1484,6 @@ class LocalStorage(Storage):
         return await asyncio.to_thread(
             self._impl.import_scope, user_id, session_id, staging_dir
         )
-
-
-
-
-
 
 
 def _row_to_user(row: sqlite3.Row) -> UserRecord:

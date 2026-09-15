@@ -23,7 +23,12 @@ def _fs_backend(tmp_path) -> FilesystemBackend:
 def test_every_registered_profile_compiles(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
     for key, profile in all_profiles().items():
-        graph = build_agent(profile, resolve_models(profile, user_id=LOCAL_USER_ID), _fs_backend(tmp_path), user_id=LOCAL_USER_ID)
+        graph = build_agent(
+            profile,
+            resolve_models(profile, user_id=LOCAL_USER_ID),
+            _fs_backend(tmp_path),
+            user_id=LOCAL_USER_ID,
+        )
         assert graph.name == key
 
 
@@ -31,7 +36,12 @@ def test_build_agent_defaults_to_in_memory_checkpointer(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
     _key, profile = next(iter(all_profiles().items()))
 
-    graph = build_agent(profile, resolve_models(profile, user_id=LOCAL_USER_ID), _fs_backend(tmp_path), user_id=LOCAL_USER_ID)
+    graph = build_agent(
+        profile,
+        resolve_models(profile, user_id=LOCAL_USER_ID),
+        _fs_backend(tmp_path),
+        user_id=LOCAL_USER_ID,
+    )
 
     assert isinstance(graph.checkpointer, InMemorySaver)
 
@@ -56,7 +66,12 @@ def test_build_agent_includes_extra_tools(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
     _key, profile = next(iter(all_profiles().items()))
 
-    without = build_agent(profile, resolve_models(profile, user_id=LOCAL_USER_ID), _fs_backend(tmp_path), user_id=LOCAL_USER_ID)
+    without = build_agent(
+        profile,
+        resolve_models(profile, user_id=LOCAL_USER_ID),
+        _fs_backend(tmp_path),
+        user_id=LOCAL_USER_ID,
+    )
     with_extra = build_agent(
         profile,
         resolve_models(profile, user_id=LOCAL_USER_ID),
@@ -73,13 +88,23 @@ def test_build_workspace_backend_matches_build_agent_routing(tmp_path):
     """`build_workspace_backend` was extracted out of `build_agent` unchanged
     (see `builder.py`) — confirm a direct call produces the same routed
     backend `build_agent` would build internally for the same profile key."""
-    direct = build_workspace_backend("research", workspace_backend=_fs_backend(tmp_path))
-    assert direct.route_prefixes == ["/workspace/", "/skills/common/", "/skills/research/", "/memory/"]
+    direct = build_workspace_backend(
+        "research", workspace_backend=_fs_backend(tmp_path)
+    )
+    assert direct.route_prefixes == [
+        "/workspace/",
+        "/skills/common/",
+        "/skills/research/",
+        "/memory/",
+    ]
 
     _key, profile = next(iter(all_profiles().items()))
     assert profile.key == "research"
     via_build_agent = build_agent(
-        profile, resolve_models(profile, user_id=LOCAL_USER_ID), _fs_backend(tmp_path), user_id=LOCAL_USER_ID
+        profile,
+        resolve_models(profile, user_id=LOCAL_USER_ID),
+        _fs_backend(tmp_path),
+        user_id=LOCAL_USER_ID,
     )
     assert via_build_agent.nodes["model"] is not None  # compiles at all
 
@@ -90,7 +115,12 @@ def test_build_workspace_backend_unknown_profile_key_mounts_empty_routes(tmp_pat
     mounts a route that just lists empty rather than erroring — this is what
     lets `chat_routes.py` reuse this same helper with `profile_key="chat"`."""
     backend = build_workspace_backend("chat", workspace_backend=_fs_backend(tmp_path))
-    assert backend.route_prefixes == ["/workspace/", "/skills/common/", "/skills/chat/", "/memory/"]
+    assert backend.route_prefixes == [
+        "/workspace/",
+        "/skills/common/",
+        "/skills/chat/",
+        "/memory/",
+    ]
 
 
 def test_readonly_backend_denies_writes(tmp_path):

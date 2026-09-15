@@ -249,8 +249,9 @@ def strip_section_markers(md: str) -> str:
 
 
 def print_tree(nodes: list[SectionNode], indent: int = 0) -> None:
+    """Debug helper: pretty-print a section tree to stdout."""
     for node in nodes:
-        print("  " * indent + f"[{node.id}] (h{node.level}) {node.title}")
+        print("  " * indent + f"[{node.id}] (h{node.level}) {node.title}")  # noqa: T201
         print_tree(node.children, indent + 1)
 
 

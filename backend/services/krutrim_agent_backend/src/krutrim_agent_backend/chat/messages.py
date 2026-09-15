@@ -22,6 +22,7 @@ def _text(content: Any) -> str:
         )
     return "" if content is None else str(content)
 
+
 def to_display_messages(
     messages: list[BaseMessage], *, include_tool_calls: bool = False
 ) -> list[dict[str, Any]]:

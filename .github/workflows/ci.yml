@@ -1,0 +1,154 @@
+name: CI
+
+# Required checks for merging into main: frontend lint/build/test, backend
+# ruff + pytest, and a build-only pass of every Dockerfile (no push). See
+# AGENTS.md "After making a code change" for why these commands were chosen.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '9'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  frontend:
+    name: Frontend (lint, build, test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Build
+        run: pnpm run build
+
+      # Runs every project's Vitest suite (each sets `watch: false`, so this
+      # exits after one run). Fails CI on any failing test; no coverage gate.
+      - name: Test
+        run: pnpm run test
+
+  backend:
+    name: Backend (ruff, pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+          cache-dependency-glob: 'backend/uv.lock'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: uv sync --all-packages
+
+      # Documented in backend/pyproject.toml's [tool.ruff] block as the
+      # CI / pre-commit gate.
+      - name: Lint (ruff check)
+        run: uv run ruff check .
+
+      - name: Format check (ruff format)
+        run: uv run ruff format --check .
+
+      # Non-blocking: currently reports 163 diagnostics against the existing
+      # codebase (mostly loose test fakes vs. strict types), so it's report-
+      # only until that backlog is cleaned up. Flip continue-on-error to
+      # false once it's clean, to make it a real gate.
+      - name: Type check (ty)
+        continue-on-error: true
+        run: uvx ty check .
+
+      # 65% is a floor, not a target (AGENTS.md: don't chase 100%). Backend
+      # is at ~87% today, so this has headroom before it bites.
+      - name: Test (pytest, with coverage gate)
+        run: >
+          uv run pytest
+          --cov=krutrim_agents_core
+          --cov=krutrim_agents
+          --cov=krutrim_agent_agui
+          --cov=krutrim_agent_management
+          --cov=krutrim_agent_sandbox
+          --cov=krutrim_agent_rag
+          --cov=krutrim_agent_doc
+          --cov=krutrim_agent_extensions
+          --cov=krutrim_agent_celery_core
+          --cov=krutrim_agent_utils
+          --cov=krutrim_agent_backend
+          --cov=krutrim_agent_celery
+          --cov-report=term-missing
+          --cov-fail-under=65
+
+  docker-build:
+    name: Docker build (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            context: backend
+            dockerfile: docker/backend.Dockerfile
+          - name: celery
+            context: backend
+            dockerfile: docker/celery.Dockerfile
+          - name: frontend
+            context: .
+            dockerfile: docker/frontend.Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build ${{ matrix.name }} image (prod target, not pushed)
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          target: prod
+          push: false
+          build-args: |
+            TORCH_BACKEND=cpu
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  ci:
+    name: CI
+    if: always()
+    needs: [frontend, backend, docker-build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all jobs to have succeeded
+        run: |
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "One or more required jobs failed." >&2
+            exit 1
+          fi

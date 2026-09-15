@@ -70,7 +70,7 @@ def parse_model_id(model_id: str) -> tuple[str, str]:
     provider, sep, model = model_id.partition(":")
     if not sep or not provider or not model:
         raise ValueError(
-            f"Malformed model id {model_id!r} — expected \"provider:model\"."
+            f'Malformed model id {model_id!r} — expected "provider:model".'
         )
     return provider, model
 

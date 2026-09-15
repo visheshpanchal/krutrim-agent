@@ -41,7 +41,9 @@ def _create_session(client: TestClient) -> str:
 
     async def _create():
         project = await storage.create_project(LOCAL_USER_ID, "P")
-        agent = await storage.create_agent(LOCAL_USER_ID, project.project_id, "research", "Test Agent")
+        agent = await storage.create_agent(
+            LOCAL_USER_ID, project.project_id, "research", "Test Agent"
+        )
         session = await storage.create_session(LOCAL_USER_ID, "agent", agent.agent_id)
         return session.session_id
 
@@ -75,7 +77,9 @@ def test_rag_file_dispatches_process_rag_document_task_and_preserves_extension(c
 
     storage = client.app.state.storage
     written = asyncio.run(
-        storage.read_workspace_file(LOCAL_USER_ID, session_id, f"_rag_uploads/{document_id}.pdf")
+        storage.read_workspace_file(
+            LOCAL_USER_ID, session_id, f"_rag_uploads/{document_id}.pdf"
+        )
     )
     assert written == b"%PDF-1.4 fake bytes"
 
@@ -83,7 +87,7 @@ def test_rag_file_dispatches_process_rag_document_task_and_preserves_extension(c
 def test_rag_file_defaults_title_to_filename(client):
     session_id = _create_session(client)
 
-    response = client.post(
+    client.post(
         f"/api/sessions/{session_id}/rag/file",
         files={"file": ("notes.txt", b"hello world", "text/plain")},
     )

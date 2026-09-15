@@ -1,5 +1,4 @@
-"""Module defining the base backend classes for Krutrim Agent Sandboxes.
-"""
+"""Module defining the base backend classes for Krutrim Agent Sandboxes."""
 
 from __future__ import annotations
 

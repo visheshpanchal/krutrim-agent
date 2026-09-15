@@ -27,9 +27,13 @@ async def _make_session_with_file(path: str, content: bytes):
     tmp = Path(tempfile.mkdtemp())
     storage = LocalStorage(tmp)
     project = await storage.create_project(LOCAL_USER_ID, "P")
-    agent = await storage.create_agent(LOCAL_USER_ID, project.project_id, "research", "Test Agent")
+    agent = await storage.create_agent(
+        LOCAL_USER_ID, project.project_id, "research", "Test Agent"
+    )
     session = await storage.create_session(LOCAL_USER_ID, "agent", agent.agent_id)
-    await storage.sync_workspace_from_container(LOCAL_USER_ID, session.session_id, [(path, content)])
+    await storage.sync_workspace_from_container(
+        LOCAL_USER_ID, session.session_id, [(path, content)]
+    )
     return storage, session.session_id
 
 
@@ -144,8 +148,8 @@ async def test_process_rag_document_reingest_replaces_old_chunks():
     )
     assert first["status"] == "ok"
 
-    await storage.sync_workspace_from_container(LOCAL_USER_ID,
-        session_id, [("_rag_uploads/doc1.txt", b"version two, shorter")]
+    await storage.sync_workspace_from_container(
+        LOCAL_USER_ID, session_id, [("_rag_uploads/doc1.txt", b"version two, shorter")]
     )
     second = await process_rag_document_once(
         storage,

@@ -63,7 +63,7 @@ class QdrantVectorStore(VectorStore):
                 vector=vector.tolist(),
                 payload={"source": source, "text": text},
             )
-            for i, (vector, text) in enumerate(zip(vectors, texts))
+            for i, (vector, text) in enumerate(zip(vectors, texts, strict=True))
         ]
         self._client.upsert(collection_name=self._collection, points=points)
 

@@ -222,9 +222,7 @@ async def invoke_agent_turn(
             incoming = HumanMessage(
                 content=message, name=f"peer_agent:{caller_session_id}"
             )
-            timeout_s = settings.user_settings(
-                user_id
-            ).cross_agent_call_timeout_seconds
+            timeout_s = settings.user_settings(user_id).cross_agent_call_timeout_seconds
             try:
                 result = await asyncio.wait_for(
                     graph.ainvoke(

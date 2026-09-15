@@ -125,8 +125,8 @@ def precompute_embeddings(
         # actual embedding job.
         try:
             publish_job_progress(pubsub, job_id, processed, total)
-        except Exception:  # noqa: BLE001
-            pass
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("precompute_embeddings: progress publish failed: {}", exc)
 
     return asyncio.run(
         precompute_embeddings_once(

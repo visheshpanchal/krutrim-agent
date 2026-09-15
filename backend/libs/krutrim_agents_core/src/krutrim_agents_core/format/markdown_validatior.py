@@ -23,14 +23,14 @@ import argparse
 import re
 import sys
 from dataclasses import dataclass, field
-from enum import Enum
+from enum import StrEnum
 
 # ---------------------------------------------------------------------------
 # Issue model
 # ---------------------------------------------------------------------------
 
 
-class Severity(str, Enum):
+class Severity(StrEnum):
     ERROR = "error"  # will break or visibly corrupt PDF/DOCX output
     WARNING = "warning"  # will render but degrades quality/fidelity
     INFO = "info"  # stylistic / spec-recommendation, non-blocking
@@ -531,10 +531,10 @@ def main() -> None:
     report = validate_document(md, target_format=args.format)
 
     for issue in report.issues:
-        print(issue)
+        print(issue)  # noqa: T201 - CLI output
 
-    print()
-    print(report.summary())
+    print()  # noqa: T201 - CLI output
+    print(report.summary())  # noqa: T201 - CLI output
     sys.exit(0 if report.is_valid else 1)
 
 

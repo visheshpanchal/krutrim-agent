@@ -2,5 +2,5 @@
   "extends": "../../tsconfig.base.json",
   "files": [],
   "include": [],
-  "references": [{ "path": "./tsconfig.renderer.json" }]
+  "references": [{ "path": "./tsconfig.renderer.json" }, { "path": "./tsconfig.spec.json" }]
 }

@@ -177,7 +177,9 @@ def test_resolve_models_session_overrides_agent_overrides_profile():
     agent_overrides = {"main": {"provider": "openrouter", "model": "agent-pick"}}
     session_overrides = {"main": {"model": "session-pick"}}
 
-    only_agent = resolve_models(profile, user_id=LOCAL_USER_ID, agent_overrides=agent_overrides)
+    only_agent = resolve_models(
+        profile, user_id=LOCAL_USER_ID, agent_overrides=agent_overrides
+    )
     assert only_agent["main"].model == "agent-pick"
 
     both = resolve_models(
@@ -195,7 +197,9 @@ def test_resolve_models_partial_override_keeps_other_fields():
     profile = _fake_profile(("main", "critic"))
     base_temp = profile.default_models["critic"].temperature
     models = resolve_models(
-        profile, user_id=LOCAL_USER_ID, agent_overrides={"critic": {"temperature": base_temp + 0.4}}
+        profile,
+        user_id=LOCAL_USER_ID,
+        agent_overrides={"critic": {"temperature": base_temp + 0.4}},
     )
     assert models["critic"].temperature == pytest.approx(base_temp + 0.4)
     assert models["critic"].model == profile.default_models["critic"].model
@@ -211,5 +215,3 @@ def test_effective_role_sources_labels_each_layer():
     assert sources["main"] == "session"
     assert sources["researcher"] == "agent"
     assert sources["critic"] == "profile"
-
-

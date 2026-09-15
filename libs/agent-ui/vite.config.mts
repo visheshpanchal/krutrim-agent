@@ -1,3 +1,4 @@
+/// <reference types='vitest' />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import dts from 'vite-plugin-dts';
@@ -19,6 +20,19 @@ export default defineConfig(() => ({
     },
     rollupOptions: {
       external: (id: string) => !/^[./]/.test(id),
+    },
+  },
+  test: {
+    name: 'agent-ui',
+    watch: false,
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['tests/setup.ts'],
+    include: ['{src,tests}/**/*.{test,spec}.{ts,tsx}'],
+    reporters: ['default'],
+    coverage: {
+      reportsDirectory: '../../coverage/libs/agent-ui',
+      provider: 'v8' as const,
     },
   },
 }));

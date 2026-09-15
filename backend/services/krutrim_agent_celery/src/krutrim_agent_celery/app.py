@@ -35,9 +35,9 @@ celery_app = build_celery_app("krutrim_agent_celery")
 # stay after `celery_app` is bound above: each task module does
 # `from krutrim_agent_celery.app import celery_app`, which only resolves once this
 # assignment has completed (see `krutrim_agent_celery_core.factory`'s docstring).
-from krutrim_agent_celery.tasks import (
+from krutrim_agent_celery.tasks import (  # noqa: E402
     precompute_embeddings as _precompute_embeddings,  # noqa: F401
 )
-from krutrim_agent_celery.tasks import (
+from krutrim_agent_celery.tasks import (  # noqa: E402
     process_rag_document as _process_rag_document,  # noqa: F401
 )
