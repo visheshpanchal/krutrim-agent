@@ -5,9 +5,9 @@ import remarkMath from 'remark-math';
 
 import 'katex/dist/katex.min.css';
 
+import { ReportFiles } from '../../components/workspace/report-files';
 import { ProseMarkdown } from '../default/prose';
 import type { ScreenOutputRendererProps } from '../types';
-import { ReportFiles } from './report-files';
 import { flattenTree, prepareResearchMarkdown, type SectionNode } from './section-markers';
 import { SectionToc } from './toc';
 

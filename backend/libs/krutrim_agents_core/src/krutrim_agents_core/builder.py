@@ -171,6 +171,44 @@ class DeepAgentContext:
         return create_deep_agent(**kwargs)
 
 
+def build_workspace_backend(
+    profile_key: str,
+    workspace_backend: BackendProtocol | None = None,
+    project_info: ProjectInfo | None = None,
+    run_logger: RunLogger | None = None,
+) -> BackendProtocol:
+    """Build the routed `/workspace` + `/skills/*` + `/memory/` backend for one
+    graph build, via `settings.default_sandbox_profile` (`"default"` point to
+    `DefaultFilesystemSandbox`) — see the module docstring's `backend` bullet.
+
+    `workspace_backend` is the raw `/workspace` backend (normally
+    `SandboxRegistry.get_or_create(...).backend`); `None` lets the sandbox
+    profile build its own from `project_info` (or fall back to in-state
+    storage for compile-only callers). `profile_key` names the `/skills/<key>/`
+    and `/memory/` routes — a key with no matching `harness/{skills,memory}/<key>/`
+    directory on disk just mounts an empty read-only route, not an error.
+    `run_logger`, when given, wraps the workspace backend in
+    `RecordingFilesystemBackend` first so the per-run eval trace captures
+    every `/workspace` read/write.
+    """
+    if run_logger is not None and workspace_backend is not None:
+        recorder = (
+            RecordingSandboxBackend
+            if isinstance(workspace_backend, SandboxBackendProtocol)
+            else RecordingFilesystemBackend
+        )
+        workspace_backend = recorder(workspace_backend, run_logger)
+
+    sandbox_profile = get_sandbox_profile(settings.default_sandbox_profile)
+    return sandbox_profile.build(
+        SandboxBuildRequest(
+            profile_key=profile_key,
+            workspace_backend=workspace_backend,
+            project_info=project_info,
+        )
+    )
+
+
 def build_agent(
     profile: AgentProfile,
     models: Mapping[str, ModelSettings],
@@ -196,22 +234,11 @@ def build_agent(
     the workspace backend in `RecordingFilesystemBackend` so the per-run eval
     trace captures every `/workspace` read/write.
     """
-    workspace_backend = sandbox
-    if run_logger is not None and workspace_backend is not None:
-        recorder = (
-            RecordingSandboxBackend
-            if isinstance(workspace_backend, SandboxBackendProtocol)
-            else RecordingFilesystemBackend
-        )
-        workspace_backend = recorder(workspace_backend, run_logger)
-
-    sandbox_profile = get_sandbox_profile(settings.default_sandbox_profile)
-    backend = sandbox_profile.build(
-        SandboxBuildRequest(
-            profile_key=profile.key,
-            workspace_backend=workspace_backend,
-            project_info=project_info,
-        )
+    backend = build_workspace_backend(
+        profile.key,
+        workspace_backend=sandbox,
+        project_info=project_info,
+        run_logger=run_logger,
     )
 
     # Sandbox execution policy — gates the file tools (real) and, under a shell
@@ -219,6 +246,7 @@ def build_agent(
     # after the frontend bridge, so a refused call never reaches the logger.
     policy = SandboxExecutionPolicy.from_settings()
     policy_middleware: list[AgentMiddleware[Any, Any, Any]] = []
+    sandbox_profile = get_sandbox_profile(settings.default_sandbox_profile)
     if policy.needs_middleware or getattr(sandbox_profile, "execute", False):
         policy_middleware = [
             SandboxPolicyMiddleware(policy, resolve_shell_path_prefixes(project_info))

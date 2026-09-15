@@ -2,6 +2,7 @@ import type { Message } from '@ag-ui/client';
 
 import { messageText, type ReasoningEntry } from '../../hooks/use-agent-stream';
 import { Markdown } from '../../components/conversation/markdown';
+import { chatSplitTurn } from './chat-split';
 import { ThinkingDisclosure } from './thinking-disclosure';
 
 export interface MessageBubbleProps {
@@ -10,15 +11,25 @@ export interface MessageBubbleProps {
   streaming?: boolean;
 }
 
+/** Shown in place of an empty narration when a deliverable's marker was
+ * emitted with nothing (or only whitespace) before it. */
+const DELIVERABLE_ONLY_FALLBACK = 'See the output panel for the full result.';
+
 export function MessageBubble({ message, reasoning, streaming }: MessageBubbleProps) {
-  const text = messageText(message);
+  const rawText = messageText(message);
   if (message.role === 'user') {
     return (
       <div className="ml-auto max-w-[85%] whitespace-pre-wrap rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground">
-        {text}
+        {rawText}
       </div>
     );
   }
+
+  // A deliverable's full content is routed to the output panel (see
+  // `chat-split.ts`) — the bubble only ever shows the narration before the
+  // `===OUTPUT===` marker, never the duplicated report body.
+  const split = chatSplitTurn(rawText, { finished: true, title: '' });
+  const text = split.output ? split.narration || DELIVERABLE_ONLY_FALLBACK : rawText;
 
   if (!text && !reasoning) return null;
 

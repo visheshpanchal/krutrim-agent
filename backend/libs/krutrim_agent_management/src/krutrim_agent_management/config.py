@@ -85,12 +85,6 @@ class ServerSettings(BaseSettings):
     # sandbox_write_paths: virtual-path globs the "edit_only" mode permits.
     sandbox_files_policy: SandboxFilesPolicy = "auto"
     sandbox_write_paths: list[str] = ["/workspace/**"]
-    # Shell command allow/deny lists — only consulted under "local-exec". Match
-    # the leading token of each `;`/`&&`/`||`/`|`-separated segment. An empty
-    # allow list permits any command not on the deny list. Advisory (a shell
-    # can be told to run anything); a real boundary comes with the sandbox.
-    # A non-empty allow list must include "python3" for the bundled
-    # data-analysis and document-export skills to run.
     sandbox_shell_allow_commands: list[str] = []
     sandbox_shell_deny_commands: list[str] = []
     #   sandbox_shell_mode:

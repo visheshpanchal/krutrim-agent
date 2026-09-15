@@ -66,7 +66,10 @@ export interface UseWorkspaceResult {
   /** `sessionId` resumes that specific session when it still exists (deep link /
    * reload); omit it to resume the agent's most recent session. */
   openAgent: (agentId: string, sessionId?: string | null) => void;
-  createChat: (displayName: string, projectId?: string | null) => void;
+  /** Resolves to the new chat's id (`null` on failure) — callers use it to
+   * also select the chat in `chat-slice` (see `workspace-rail.tsx`), since
+   * this thunk only creates it in `workspace-slice`. */
+  createChat: (displayName: string, projectId?: string | null) => Promise<string | null>;
   renameChatName: (chatId: string, displayName: string) => void;
   changeChatModel: (chatId: string, modelId: string) => void;
   deleteChat: (chatId: string) => void;
@@ -124,8 +127,13 @@ export function useWorkspace({ backendUrl }: UseWorkspaceOptions): UseWorkspaceR
     deleteAgent: (projectId, agentId) => {
       dispatch(deleteAgentById({ projectId, agentId }));
     },
-    createChat: (displayName, projectId) => {
-      dispatch(createNewChat({ displayName, projectId }));
+    createChat: async (displayName, projectId) => {
+      try {
+        const chat = await dispatch(createNewChat({ displayName, projectId })).unwrap();
+        return chat.chat_id;
+      } catch {
+        return null;
+      }
     },
     renameChatName: (chatId, displayName) => {
       dispatch(renameChat({ chatId, displayName }));

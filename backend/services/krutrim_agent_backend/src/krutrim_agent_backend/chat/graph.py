@@ -1,20 +1,30 @@
 from __future__ import annotations
 
-import inspect
 from typing import TYPE_CHECKING, Any
 
 from deepagents import DeepAgentState
 from deepagents.backends import StateBackend
+from deepagents.middleware.filesystem import FilesystemMiddleware
+from deepagents.middleware.skills import SkillsMiddleware
 from krutrim_agent_management.config import settings
-from krutrim_agents_core.harness.prompts import PromptLibrary
-from langchain.agents.middleware.types import (
-    AgentMiddleware,
-    ExtendedModelResponse,
-    ModelRequest,
-    ModelResponse,
+from krutrim_agents_core.agent_graph import (
+    compose_awrap_tool_call as _compose_awrap_tool_call,
 )
+from krutrim_agents_core.agent_graph import (
+    compose_wrap_model_call as _compose_wrap_model_call,
+)
+from krutrim_agents_core.agent_graph import (
+    compose_wrap_tool_call as _compose_wrap_tool_call,
+)
+from krutrim_agents_core.agent_graph import (
+    normalize_model_result as _normalize_model_result,
+)
+from krutrim_agents_core.agent_graph import (
+    run_state_hooks as _run_state_hooks,
+)
+from krutrim_agents_core.harness.prompts import PromptLibrary
+from langchain.agents.middleware.types import ModelRequest, ModelResponse
 from langchain_core.messages import AIMessage, SystemMessage
-from langgraph.config import get_config
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
 from langgraph.runtime import get_runtime
@@ -24,7 +34,7 @@ if TYPE_CHECKING:
 
     from deepagents.backends.protocol import BackendProtocol
     from deepagents.middleware.filesystem import FilesystemPermission
-    from langchain.agents.middleware.types import ToolCallRequest
+    from langchain.agents.middleware.types import AgentMiddleware
     from langchain_core.language_models import BaseChatModel
     from langchain_core.messages import AnyMessage
     from langchain_core.tools import BaseTool
@@ -33,84 +43,22 @@ if TYPE_CHECKING:
     from langgraph.graph.state import CompiledStateGraph
     from langgraph.store.base import BaseStore
 
-
-# 1. Middleware hook runner
-
-
-def _overrides(mw: AgentMiddleware, hook_name: str) -> bool:
-    """True if `mw` actually implements `hook_name` (base default raises, not no-ops)."""
-    return getattr(type(mw), hook_name) is not getattr(AgentMiddleware, hook_name)
-
-
-def _hook_accepts_config(mw: AgentMiddleware, hook_name: str) -> bool:
-    """True if `mw`'s override of `hook_name` declares a `config` parameter.
-
-    `AgentMiddleware`'s base hooks take only `(state, runtime)`, but some
-    deepagents middleware (`SkillsMiddleware`/`MemoryMiddleware`'s
-    `before_agent`) override with an extra `config: RunnableConfig` param —
-    calling those without it raises `TypeError`.
-    """
-    return "config" in inspect.signature(getattr(type(mw), hook_name)).parameters
-
-
-def _run_state_hooks(
-    middlewares: Sequence[AgentMiddleware], hook_name: str, state: dict[str, Any]
-) -> dict[str, Any]:
-    """Run a hook (before_agent/before_model/after_model) across middlewares, merging updates."""
-    runtime = get_runtime()
-    updates: dict[str, Any] = {}
-    for mw in middlewares:
-        if not _overrides(mw, hook_name):
-            continue
-        kwargs = {"config": get_config()} if _hook_accepts_config(mw, hook_name) else {}
-        result = getattr(mw, hook_name)({**state, **updates}, runtime, **kwargs)
-        if result:
-            updates.update(result)
-    return updates
-
-
-def _compose_wrap_model_call(
-    middlewares: Sequence[AgentMiddleware], base_handler
-) -> Any:
-    """Chain `wrap_model_call` hooks: first middleware in the list becomes outermost."""
-    chain = base_handler
-    for mw in reversed([m for m in middlewares if _overrides(m, "wrap_model_call")]):
-
-        def step(request: ModelRequest, _next=chain, _mw=mw) -> ModelResponse:
-            return _mw.wrap_model_call(request, _next)
-
-        chain = step
-    return chain
-
-
-def _compose_wrap_tool_call(middlewares: Sequence[AgentMiddleware]):
-    """Chain `wrap_tool_call` hooks; `None` if none defined, so `ToolNode` uses its default."""
-    wrapping = [m for m in middlewares if _overrides(m, "wrap_tool_call")]
-    if not wrapping:
-        return None
-
-    def composed(request: ToolCallRequest, handler):
-        chain = handler
-        for mw in reversed(wrapping):
-
-            def step(req: ToolCallRequest, _next=chain, _mw=mw):
-                return _mw.wrap_tool_call(req, _next)
-
-            chain = step
-        return chain(request)
-
-    return composed
-
-
-def _normalize_model_result(result) -> ModelResponse:
-    """`wrap_model_call` handlers may return `ModelResponse | AIMessage | ExtendedModelResponse`."""
-    if isinstance(result, AIMessage):
-        return ModelResponse(result=[result])
-    if isinstance(result, ExtendedModelResponse):
-        # `.command` is intentionally dropped — see design doc.
-        return result.model_response
-    return result
-
+# Middleware hook composition (`_run_state_hooks`/`_compose_*wrap_*_call`/
+# `_normalize_model_result`) lives in `krutrim_agents_core.agent_graph`,
+# shared with `krutrim_agents.profiles.research.agent.create_research_agent`
+# — the other hand-rolled ReAct graph in this codebase — so the two copies
+# can't drift apart. `_compose_awrap_tool_call` in particular is what keeps
+# `ToolNode` (below) on its real async path once any middleware in the stack
+# (e.g. `FilesystemMiddleware`) defines a sync `wrap_tool_call`: without it,
+# `ToolNode`'s async run falls back to a sync tool executor, which raises
+# `NotImplementedError: StructuredTool does not support sync invocation.` the
+# moment an async-only tool (`web_search`, `web_fetch`, `rag_tool`) is called.
+#
+# NOTE: unlike `create_research_agent`, the model/before_agent nodes below
+# are still sync-only (no `_arun_state_hooks`/`_compose_awrap_model_call`
+# equivalent), so an async-only middleware hook (e.g. `SkillsMiddleware`'s
+# `abefore_agent`/`awrap_model_call`) is silently skipped here. Not fixed in
+# this change — flagging it so it isn't mistaken for "already handled".
 
 # 2. Graph nodes
 
@@ -206,14 +154,30 @@ def build_chat_graph(
     `system_prompt_fn`, when supplied, takes precedence over the static
     `system_prompt` string and is re-invoked with the graph's working state
     on every model-node call — see `_make_model_node`.
+
+    `backend`/`skills`/`permissions` grant file capability only when the
+    caller explicitly opts in by passing a `backend` (normally the session's
+    sandboxed workspace, e.g. via `krutrim_agents_core.builder.build_workspace_backend`):
+    a `FilesystemMiddleware` is then added so the model gets `write_file`/
+    `read_file`/`edit_file`/`ls`/`glob`/`grep`/`delete`, and, when `skills` is
+    non-empty, a `SkillsMiddleware` for the given skill sources (e.g.
+    `document-export`). Omitting `backend` keeps today's tool-free chat graph
+    unchanged — used by compile-only callers (e.g. reading checkpoint state).
+    `memory` is accepted for signature parity with `create_deep_agent` but
+    unused — chat has no per-chat long-term memory file yet.
     """
     prompt_lib = PromptLibrary(settings.prompts_root_dir)
     if system_prompt == "default" or system_prompt is None:
         system_prompt = prompt_lib.render("chat_system", scope="default")
+    has_backend = backend is not None
     backend = backend or StateBackend()
 
     stack: list[AgentMiddleware] = []
     stack.extend(middleware or [])
+    if skills:
+        stack.append(SkillsMiddleware(backend=backend, sources=skills))
+    if has_backend:
+        stack.append(FilesystemMiddleware(backend=backend, _permissions=permissions))
 
     # every middleware may contribute tools (e.g. SubAgentMiddleware -> `task`)
     all_tools: list[BaseTool] = [*(tools or [])]
@@ -235,7 +199,12 @@ def build_chat_graph(
 
     if all_tools:
         graph.add_node(
-            "tools", ToolNode(all_tools, wrap_tool_call=_compose_wrap_tool_call(stack))
+            "tools",
+            ToolNode(
+                all_tools,
+                wrap_tool_call=_compose_wrap_tool_call(stack),
+                awrap_tool_call=_compose_awrap_tool_call(stack),
+            ),
         )
         graph.add_conditional_edges(
             "model", _route_after_model, {"tools": "tools", END: END}

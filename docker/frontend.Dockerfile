@@ -26,7 +26,6 @@ WORKDIR /app
 ENV CI=1
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY libs/agent-dashboard/package.json  libs/agent-dashboard/
 COPY libs/agent-ui/package.json         libs/agent-ui/
 COPY libs/extensions/package.json       libs/extensions/
 COPY libs/shared-types/package.json     libs/shared-types/

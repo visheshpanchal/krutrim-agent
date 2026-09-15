@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import inspect
 from typing import TYPE_CHECKING, Any
 
 from deepagents import DeepAgentState
@@ -10,14 +9,29 @@ from deepagents.middleware.memory import MemoryMiddleware
 from deepagents.middleware.patch_tool_calls import PatchToolCallsMiddleware
 from deepagents.middleware.skills import SkillsMiddleware
 from deepagents.middleware.subagents import SubAgentMiddleware
-from langchain.agents.middleware.types import (
-    AgentMiddleware,
-    ExtendedModelResponse,
-    ModelRequest,
-    ModelResponse,
+from krutrim_agents_core.agent_graph import (
+    arun_state_hooks as _arun_state_hooks,
 )
+from krutrim_agents_core.agent_graph import (
+    compose_awrap_model_call as _compose_awrap_model_call,
+)
+from krutrim_agents_core.agent_graph import (
+    compose_awrap_tool_call as _compose_awrap_tool_call,
+)
+from krutrim_agents_core.agent_graph import (
+    compose_wrap_model_call as _compose_wrap_model_call,
+)
+from krutrim_agents_core.agent_graph import (
+    compose_wrap_tool_call as _compose_wrap_tool_call,
+)
+from krutrim_agents_core.agent_graph import (
+    normalize_model_result as _normalize_model_result,
+)
+from krutrim_agents_core.agent_graph import (
+    run_state_hooks as _run_state_hooks,
+)
+from langchain.agents.middleware.types import ModelRequest, ModelResponse
 from langchain_core.messages import AIMessage, SystemMessage
-from langgraph.config import get_config
 from langgraph.graph import END, START, StateGraph
 from langgraph.prebuilt import ToolNode
 from langgraph.runtime import get_runtime
@@ -29,7 +43,7 @@ if TYPE_CHECKING:
     from deepagents.backends.protocol import BackendProtocol
     from deepagents.middleware.filesystem import FilesystemPermission
     from deepagents.middleware.subagents import CompiledSubAgent, SubAgent
-    from langchain.agents.middleware.types import ToolCallRequest
+    from langchain.agents.middleware.types import AgentMiddleware
     from langchain_core.language_models import BaseChatModel
     from langchain_core.messages import AnyMessage
     from langchain_core.tools import BaseTool
@@ -38,153 +52,11 @@ if TYPE_CHECKING:
     from langgraph.graph.state import CompiledStateGraph
     from langgraph.store.base import BaseStore
 
-
-# 1. Middleware hook runner
-
-
-def _overrides(mw: AgentMiddleware, hook_name: str) -> bool:
-    """True if `mw` actually implements `hook_name` (base default raises, not no-ops)."""
-    return getattr(type(mw), hook_name) is not getattr(AgentMiddleware, hook_name)
-
-
-def _hook_accepts_config(mw: AgentMiddleware, hook_name: str) -> bool:
-    """True if `mw`'s override of `hook_name` declares a `config` parameter.
-
-    `AgentMiddleware`'s base hooks take only `(state, runtime)`, but some
-    deepagents middleware (`SkillsMiddleware`/`MemoryMiddleware`'s
-    `before_agent`) override with an extra `config: RunnableConfig` param —
-    calling those without it raises `TypeError`.
-    """
-    return "config" in inspect.signature(getattr(type(mw), hook_name)).parameters
-
-
-def _run_state_hooks(
-    middlewares: Sequence[AgentMiddleware], hook_name: str, state: dict[str, Any]
-) -> dict[str, Any]:
-    """Run a hook (before_agent/before_model/after_model) across middlewares, merging updates."""
-    runtime = get_runtime()
-    updates: dict[str, Any] = {}
-    for mw in middlewares:
-        if not _overrides(mw, hook_name):
-            continue
-        kwargs = {"config": get_config()} if _hook_accepts_config(mw, hook_name) else {}
-        result = getattr(mw, hook_name)({**state, **updates}, runtime, **kwargs)
-        if result:
-            updates.update(result)
-    return updates
-
-
-async def _arun_state_hooks(
-    middlewares: Sequence[AgentMiddleware], hook_name: str, state: dict[str, Any]
-) -> dict[str, Any]:
-    """Async twin of `_run_state_hooks`: prefer a middleware's `a<hook>` override
-    (awaited), fall back to its sync override. Used by the async graph path so a
-    hook never forces a sync call into the async-only checkpointer."""
-    runtime = get_runtime()
-    ahook = f"a{hook_name}"
-    updates: dict[str, Any] = {}
-    for mw in middlewares:
-        if _overrides(mw, ahook):
-            name = ahook
-            result = getattr(mw, name)(
-                {**state, **updates},
-                runtime,
-                **({"config": get_config()} if _hook_accepts_config(mw, name) else {}),
-            )
-            result = await result
-        elif _overrides(mw, hook_name):
-            name = hook_name
-            result = getattr(mw, name)(
-                {**state, **updates},
-                runtime,
-                **({"config": get_config()} if _hook_accepts_config(mw, name) else {}),
-            )
-        else:
-            continue
-        if result:
-            updates.update(result)
-    return updates
-
-
-def _compose_wrap_model_call(
-    middlewares: Sequence[AgentMiddleware], base_handler
-) -> Any:
-    """Chain `wrap_model_call` hooks: first middleware in the list becomes outermost."""
-    chain = base_handler
-    for mw in reversed([m for m in middlewares if _overrides(m, "wrap_model_call")]):
-
-        def step(request: ModelRequest, _next=chain, _mw=mw) -> ModelResponse:
-            return _mw.wrap_model_call(request, _next)
-
-        chain = step
-    return chain
-
-
-def _compose_awrap_model_call(
-    middlewares: Sequence[AgentMiddleware], abase_handler
-) -> Any:
-    """Async twin of `_compose_wrap_model_call` — chains `awrap_model_call`."""
-    chain = abase_handler
-    for mw in reversed([m for m in middlewares if _overrides(m, "awrap_model_call")]):
-
-        async def step(request: ModelRequest, _next=chain, _mw=mw) -> ModelResponse:
-            return await _mw.awrap_model_call(request, _next)
-
-        chain = step
-    return chain
-
-
-def _compose_wrap_tool_call(middlewares: Sequence[AgentMiddleware]):
-    """Chain `wrap_tool_call` hooks; `None` if none defined, so `ToolNode` uses its default."""
-    wrapping = [m for m in middlewares if _overrides(m, "wrap_tool_call")]
-    if not wrapping:
-        return None
-
-    def composed(request: ToolCallRequest, handler):
-        chain = handler
-        for mw in reversed(wrapping):
-
-            def step(req: ToolCallRequest, _next=chain, _mw=mw):
-                return _mw.wrap_tool_call(req, _next)
-
-            chain = step
-        return chain(request)
-
-    return composed
-
-
-def _compose_awrap_tool_call(middlewares: Sequence[AgentMiddleware]):
-    """Async twin of `_compose_wrap_tool_call`, passed to `ToolNode` as
-    `awrap_tool_call`. Without it `ToolNode`'s async path falls back to the sync
-    `wrap_tool_call` + a sync tool executor — which runs async-only tools and any
-    nested subagent graph (sharing the async checkpointer) synchronously on the
-    event loop thread, raising `AsyncSqliteSaver` / `StructuredTool` errors."""
-    wrapping = [m for m in middlewares if _overrides(m, "awrap_tool_call")]
-    if not wrapping:
-        return None
-
-    async def composed(request: ToolCallRequest, handler):
-        chain = handler
-        for mw in reversed(wrapping):
-
-            async def step(req: ToolCallRequest, _next=chain, _mw=mw):
-                return await _mw.awrap_tool_call(req, _next)
-
-            chain = step
-        return await chain(request)
-
-    return composed
-
-
-def _normalize_model_result(result) -> ModelResponse:
-    """`wrap_model_call` handlers may return `ModelResponse | AIMessage | ExtendedModelResponse`."""
-    if isinstance(result, AIMessage):
-        return ModelResponse(result=[result])
-    if isinstance(result, ExtendedModelResponse):
-        # `.command` is intentionally dropped — see design doc.
-        return result.model_response
-    return result
-
+# Middleware hook composition (`_overrides`/`_run_state_hooks`/
+# `_compose_*wrap_*_call`/`_normalize_model_result`) lives in
+# `krutrim_agents_core.agent_graph`, shared with
+# `krutrim_agent_backend.chat.graph.build_chat_graph` — the other hand-rolled
+# ReAct graph in this codebase — so the two copies can't drift apart.
 
 # 2. Graph nodes
 

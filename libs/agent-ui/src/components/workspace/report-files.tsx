@@ -1,3 +1,7 @@
+/**
+ * common logic for agents and chat to create report files and export them.
+ */
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@krutrim_agent/ui';
 import { Download, FileText, Loader2, RefreshCw } from 'lucide-react';
