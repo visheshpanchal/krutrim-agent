@@ -37,6 +37,8 @@ from krutrim_agent_management.models import Chat, SessionInfo
 from krutrim_agent_management.storage.base import Storage
 from krutrim_agent_rag.middleware import RagInjectionMiddleware
 from krutrim_agent_rag.tool import rag_tool
+from krutrim_agent_sandbox.registry import AttachHandle, SandboxRegistry
+from krutrim_agents_core.builder import build_workspace_backend
 from krutrim_agents_core.providers.registry import build_chat_model
 from krutrim_agents_core.tools import datetime_tool, web_fetch, web_search
 from langchain_core.messages import AIMessage
@@ -60,6 +62,7 @@ CHECKPOINT_FILENAME = "langgraph_checkpoint.sqlite"
 #: the frontend stashes it and applies it on ``RUN_FINISHED``.
 CHAT_SESSION_EVENT = "chat_session"
 TOOLS = [datetime_tool, web_fetch, rag_tool, web_search]
+CHAT_SKILLS = ["/skills/common/"]
 
 
 class ChatMessageRequest(BaseModel):
@@ -149,6 +152,7 @@ async def send_message(
     `project_id`, `model_id`, `chat_title`) ride in `forwardedProps`;
     the user turn is the last `user` message in `input_data.messages`."""
     storage = _storage(request)
+    sandbox_registry: SandboxRegistry = request.app.state.sandbox_registry
     user_id = current_user_id(request)
     fp = input_data.forwarded_props or {}
     body = ChatMessageRequest(
@@ -165,6 +169,12 @@ async def send_message(
     )
 
     checkpoint_path = storage.session_dir(session.session_id) / CHECKPOINT_FILENAME
+    handle: AttachHandle = await sandbox_registry.get_or_create(
+        user_id, session.session_id
+    )
+    workspace_backend = build_workspace_backend(
+        "chat", workspace_backend=handle.backend
+    )
     chat_model = build_chat_model({"provider": chat.provider, "model": chat.model})
     # Ask the provider to report token usage on the final streamed chunk so
     # `on_finish` can fold it into usage.json (ChatOpenAI/OpenRouter supports
@@ -213,6 +223,8 @@ async def send_message(
                     checkpointer=checkpointer,
                     tools=TOOLS,
                     middleware=middleware,
+                    backend=workspace_backend,
+                    skills=CHAT_SKILLS,
                 )
                 async for event in run_graph_as_agui(
                     graph,

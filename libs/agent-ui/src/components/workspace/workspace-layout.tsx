@@ -92,6 +92,12 @@ export function WorkspaceLayout({ backendUrl }: WorkspaceLayoutProps) {
         : 'home';
   const screen = getScreen(screenKey);
   const isAgentScreen = selection?.kind === 'agent';
+  const isChatScreen = screenKey === 'chat';
+  // Both agent-type screens and chat can produce canvas output now — chat
+  // only actually populates it for a turn carrying the `===OUTPUT===` marker
+  // (see `chat-split.ts`); an ordinary short answer leaves `outputPayload`
+  // `null` and the panel shows its empty state.
+  const canvasCapable = isAgentScreen || isChatScreen;
 
   // The latest assistant turn is divided by the screen's own splitter (see
   // `screens/<key>/` — `research` splits on `===FINAL_REPORT===`) into
@@ -110,7 +116,17 @@ export function WorkspaceLayout({ backendUrl }: WorkspaceLayoutProps) {
   const assistantTurn = deriveAssistantTurn(agentChat.messages, screenKey, activeAgent?.display_name ?? '', {
     finished: turnFinished,
   });
-  const outputPayload = isAgentScreen ? assistantTurn.output : null;
+  // Chat's own assistant-turn split — `chatSplitTurn`'s fallback (no marker
+  // found) always returns `output: null` regardless of `finished`, so this
+  // never needs the agent path's `turnFinished` gating.
+  const chatAssistantTurn = isChatScreen
+    ? deriveAssistantTurn(chatStream.messages, 'chat', activeChat?.display_name ?? 'Chat', {
+        finished: !chatStream.isRunning,
+      })
+    : { narration: '', output: null };
+  const outputPayload = isAgentScreen ? assistantTurn.output : isChatScreen ? chatAssistantTurn.output : null;
+  // The screen currently driving the output panel's busy/auto-reveal state.
+  const currentIsRunning = isAgentScreen ? agentChat.isRunning : isChatScreen ? chatStream.isRunning : false;
   // The current (last) turn's activity trace. Live while a run is in flight or
   // once it has produced steps; otherwise the last turn's steps rebuilt from
   // the checkpoint (`useAgentHistory` — tool calls only; steps aren't
@@ -183,15 +199,15 @@ export function WorkspaceLayout({ backendUrl }: WorkspaceLayoutProps) {
   // run finishes. Never auto-closes; a manual toggle is respected.
   const wasRunningRef = useRef(false);
   useEffect(() => {
-    const justFinished = wasRunningRef.current && !agentChat.isRunning;
-    wasRunningRef.current = agentChat.isRunning;
-    if (outputPayload && (justFinished || agentChat.isRunning)) setOutputCollapsed(false);
-  }, [agentChat.isRunning, outputPayload]);
+    const justFinished = wasRunningRef.current && !currentIsRunning;
+    wasRunningRef.current = currentIsRunning;
+    if (outputPayload && (justFinished || currentIsRunning)) setOutputCollapsed(false);
+  }, [currentIsRunning, outputPayload]);
 
   // A fresh session starts with the explorer tucked away again.
   useEffect(() => {
     setOutputCollapsed(true);
-  }, [activeAgentSessionId]);
+  }, [activeAgentSessionId, chat.historySessionId]);
 
   // Agent-owned session details aren't tracked here yet (the AG-UI client that will actually
   // need them is a later pass) — so an Agent's sandbox settings only cover its own
@@ -229,13 +245,15 @@ export function WorkspaceLayout({ backendUrl }: WorkspaceLayoutProps) {
         onToggle={() => setOutputCollapsed((v) => !v)}
         width={outputWidth}
         screen={screen}
-        canvasCapable={isAgentScreen}
+        canvasCapable={canvasCapable}
         payload={outputPayload}
-        busy={agentChat.isRunning}
+        busy={currentIsRunning}
         session={
           isAgentScreen && activeAgentSessionId
             ? { backendUrl, sessionId: activeAgentSessionId, sendMessage: agentChat.sendMessage }
-            : undefined
+            : isChatScreen && chat.historySessionId
+              ? { backendUrl, sessionId: chat.historySessionId, sendMessage: chatStream.sendMessage }
+              : undefined
         }
       />
 

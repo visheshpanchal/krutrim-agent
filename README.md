@@ -13,8 +13,7 @@ The one load-bearing design decision. **Core** is never touched to add an agent:
 -   **Frontend** — optional: one folder `libs/agent-ui/src/screens/<key>/` exporting an `AgentScreenModule` plus one line in `screens/registry.ts`. Omit it and the `default` screen (shared thread + built-in markdown/chart renderer) is used.
     
 
-This split isn’t a single mechanism — it’s several independent registries (agent profiles, storage backends, vector stores/retrieval strategies, security/governance extensions, sandbox profiles), each discovered its own way. See [Hooks / Public API](#hooks--public-api) below for the full inventory and where it’s inconsistent.
-
+This split isn’t a single mechanism — it’s several independent registries (agent profiles, storage backends, vector stores/retrieval strategies, security/governance extensions, sandbox profiles), each discovered its own way. 
 ## Features
 
 ### Research agent

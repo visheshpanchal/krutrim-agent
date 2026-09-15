@@ -28,4 +28,8 @@ Name Guidelines:
 
 Only apply this naming step when a chat is explicitly being reviewed or named — not on regular conversational turns.
 
+{clarify_before_deliverable}
+
+{output_decision}
+
 {base}

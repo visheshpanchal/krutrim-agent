@@ -16,8 +16,10 @@ from krutrim_agent_backend.api.projects_routes import router as projects_router
 from krutrim_agent_backend.api.sessions_routes import router as sessions_router
 from krutrim_agent_management import LocalStorage
 from krutrim_agent_management.config import DEFAULT_MODEL
-from langchain_core.language_models import GenericFakeChatModel
-from langchain_core.messages import AIMessage
+from krutrim_agent_sandbox.registry import SandboxRegistry
+from langchain_core.language_models import BaseChatModel, GenericFakeChatModel
+from langchain_core.messages import AIMessage, AIMessageChunk
+from langchain_core.outputs import ChatGenerationChunk
 
 REPLY_TEXT = "Hello there friend"
 
@@ -48,6 +50,7 @@ def client(tmp_path, monkeypatch):
 
     app = FastAPI()
     app.state.storage = LocalStorage(tmp_path)
+    app.state.sandbox_registry = SandboxRegistry(store=app.state.storage)
     app.include_router(projects_router)
     app.include_router(chats_router)
     app.include_router(sessions_router)
@@ -195,6 +198,79 @@ def test_session_from_different_chat_returns_400(client):
         session_id=second["session_id"],
     )
     assert result["status"] == 400
+
+
+class _ScriptedToolCallingChatModel(BaseChatModel):
+    """Replays a fixed sequence of `AIMessage`s, one per model call, each
+    streamed as a single chunk so `tool_calls` survive the accumulation in
+    `chat/graph.py`'s model node (`GenericFakeChatModel`'s built-in streaming
+    re-tokenizes `.content` and drops `tool_calls` in the process)."""
+
+    turns: list[AIMessage]
+    _index: int = 0
+
+    def bind_tools(self, tools, **kwargs):
+        return self
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        raise NotImplementedError("only .stream() is used by chat/graph.py")
+
+    def _stream(self, messages, stop=None, run_manager=None, **kwargs):
+        message = self.turns[self._index]
+        self._index += 1
+        chunk = AIMessageChunk(content=message.content, tool_calls=message.tool_calls)
+        yield ChatGenerationChunk(message=chunk)
+
+    @property
+    def _llm_type(self) -> str:
+        return "scripted-tool-calling-fake"
+
+
+def _deliverable_fake_model_factory(_settings):
+    """First turn calls `write_file` (exercising the sandboxed workspace
+    backend wired into `build_chat_graph`); second turn answers with the
+    narration + `===OUTPUT===` marker + report, as `output-decision.md`
+    instructs the model to."""
+    return _ScriptedToolCallingChatModel(
+        turns=[
+            AIMessage(
+                content="One moment.",
+                tool_calls=[
+                    {
+                        "name": "write_file",
+                        "args": {
+                            "file_path": "/workspace/analysis.md",
+                            "content": "# Analysis\n\nDetailed findings.",
+                        },
+                        "id": "call_1",
+                    }
+                ],
+            ),
+            AIMessage(
+                content=(
+                    "I've put together the analysis and saved it below.\n\n"
+                    "===OUTPUT===\n\n"
+                    "# Analysis\n\nDetailed findings."
+                )
+            ),
+        ]
+    )
+
+
+def test_deliverable_marker_saves_file_and_is_downloadable(client, monkeypatch):
+    monkeypatch.setattr(chat_routes, "build_chat_model", _deliverable_fake_model_factory)
+
+    result = send_chat(client, message="Analyze this in depth")
+
+    assert result["status"] == 200
+    assert "===OUTPUT===" in result["text"]
+
+    files = client.get(f"/api/sessions/{result['session_id']}/files").json()["files"]
+    assert [f["path"] for f in files] == ["analysis.md"]
+
+    download = client.get(f"/api/sessions/{result['session_id']}/files/analysis.md")
+    assert download.status_code == 200
+    assert download.text == "# Analysis\n\nDetailed findings."
 
 
 def test_unknown_model_returns_400(client):

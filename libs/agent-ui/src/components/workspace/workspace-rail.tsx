@@ -174,7 +174,10 @@ export function WorkspaceRail({ collapsed, onToggle, backendUrl, workspace, onOp
         <NewChatDialog
           projects={workspace.projects}
           defaultProjectId={activeDialog.defaultProjectId}
-          onCreate={(displayName, projectId) => workspace.createChat(displayName, projectId)}
+          onCreate={async (displayName, projectId) => {
+            const chatId = await workspace.createChat(displayName, projectId);
+            if (chatId) onOpenChatSession(chatId);
+          }}
           onClose={() => setActiveDialog(null)}
         />
       )}
