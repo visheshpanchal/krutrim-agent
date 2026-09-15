@@ -1,3 +1,4 @@
+/// <reference types='vitest' />
 import { defineConfig } from 'vite';
 import dts from 'vite-plugin-dts';
 
@@ -23,6 +24,18 @@ export default defineConfig(() => ({
     },
     rollupOptions: {
       external: (id: string) => !/^[./]/.test(id),
+    },
+  },
+  test: {
+    name: 'shared-types',
+    watch: false,
+    globals: true,
+    environment: 'node',
+    include: ['{src,tests}/**/*.{test,spec}.ts'],
+    reporters: ['default'],
+    coverage: {
+      reportsDirectory: '../../coverage/libs/shared-types',
+      provider: 'v8' as const,
     },
   },
 }));

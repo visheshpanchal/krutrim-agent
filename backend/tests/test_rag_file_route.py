@@ -83,7 +83,7 @@ def test_rag_file_dispatches_process_rag_document_task_and_preserves_extension(c
 def test_rag_file_defaults_title_to_filename(client):
     session_id = _create_session(client)
 
-    response = client.post(
+    client.post(
         f"/api/sessions/{session_id}/rag/file",
         files={"file": ("notes.txt", b"hello world", "text/plain")},
     )

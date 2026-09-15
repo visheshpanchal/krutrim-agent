@@ -40,6 +40,8 @@ export default defineConfig(() => ({
     globals: true,
     environment: 'jsdom',
     include: ['{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+    // No test files exist yet for this app; don't fail CI until some do.
+    passWithNoTests: true,
     reporters: ['default'],
     coverage: {
       reportsDirectory: '../../coverage/apps/web',
