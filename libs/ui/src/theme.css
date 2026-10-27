@@ -12,11 +12,11 @@
 
 /*
   Tailwind's automatic content detection is scoped to each app's Vite root
-  (apps/web, apps/desktop) and never walks sideways into sibling `libs/*`
+  (apps/web) and never walks sideways into sibling `libs/*`
   packages — so classNames used in libs/agent-ui and this package itself
   would otherwise be silently dropped from the compiled
   CSS. Paths below are resolved relative to this file (libs/ui/src/theme.css)
-  and only resolve for IN-REPO consumers (apps/web, apps/desktop). An
+  and only resolve for IN-REPO consumers (apps/web). An
   external package consumer (installing this package from node_modules
   instead) won't have these particular paths on disk, so these lines are
   simply inert for them, not broken — see the root README for the

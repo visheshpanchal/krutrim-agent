@@ -3,7 +3,7 @@ import { defineConfig } from 'vite';
 import dts from 'vite-plugin-dts';
 
 // Library build (produces an installable `dist/` for `package.json`'s
-// main/module/types) — distinct from an *app* build (apps/web/apps/desktop),
+// main/module/types) — distinct from an *app* build (apps/web),
 // which bundles everything for the browser. `external` treats every bare
 // specifier (anything not starting with `.` or `/`) as external rather than
 // bundled — that's every npm package this lib imports plus every sibling

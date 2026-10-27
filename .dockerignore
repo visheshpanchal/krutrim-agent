@@ -7,7 +7,6 @@ coverage/
 *.tsbuildinfo
 
 backend/
-apps/desktop/
 
 # .gitignore
 .env

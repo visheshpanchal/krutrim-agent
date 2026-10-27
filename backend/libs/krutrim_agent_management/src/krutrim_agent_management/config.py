@@ -424,14 +424,14 @@ class AppSettings:
     @property
     def base_home_root(self) -> Path:
         """Root of the runtime-config tree — holds `.jwt_secret` and the
-        per-user `users/<id>/` subtree. Follows `set_home_root()` (tests /
-        desktop) but is never user-scoped, unlike `home_root_path()`."""
+        per-user `users/<id>/` subtree. Follows `set_home_root()` (tests) but
+        is never user-scoped, unlike `home_root_path()`."""
         return self._home_root
 
     def home_dir_path(self, user_id: str) -> Path:
         """This user's runtime-config directory — `<base>/users/<user_id>/`,
         holding their `config.json`, `mcp.json`, `credentials.json`. Follows
-        `set_home_root()` (tests / desktop)."""
+        `set_home_root()` (tests)."""
         return self._home_root / _USERS_SUBDIR / user_id
 
     def user_config_path(self, user_id: str) -> Path:
@@ -522,8 +522,8 @@ class AppSettings:
             return self._load_uid_locked(user_id)
 
     def set_home_root(self, path: Path | str) -> None:
-        """Point the config tree at a different base dir — for tests, and for a
-        desktop shell using an OS app-data dir. Clears every per-user cache."""
+        """Point the config tree at a different base dir — for tests. Clears
+        every per-user cache."""
         with self._lock:
             self._home_root = Path(path)
             self._user_by_uid.clear()

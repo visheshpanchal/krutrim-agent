@@ -10,7 +10,7 @@ generalised, for the free-form stores.
 
 Every call takes the `user_id` whose file to act on; the directory is resolved
 fresh from `AppSettings.home_root_path(user_id)` so `settings.set_home_root()`
-(tests, a desktop shell) repoints every store. The mtime cache is keyed by the
+(tests) repoints every store. The mtime cache is keyed by the
 resolved path, so alternating users don't evict each other.
 """
 

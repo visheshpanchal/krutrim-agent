@@ -9,9 +9,7 @@ recurring reason is the core/plugin split — see the section below).
 
 ```
 apps/
-  web/       Vite + React + TS web frontend (:4200) — primary delivery target.
-  desktop/   Tauri (Rust shell) hosting the SAME React renderer as web (:4300 dev)
-             — native desktop build with no second UI codebase.
+  web/       Vite + React + TS web frontend (:4200) — the delivery target.
 
 backend/            uv workspace. `uv run` anything from here.
   libs/
@@ -51,7 +49,7 @@ backend/            uv workspace. `uv run` anything from here.
   services/
     krutrim_agent_backend/  FastAPI app: AG-UI agent-run streaming, plain chat,
                            project/session/settings CRUD. WHY: the deployable
-                           API both frontends talk to.
+                           API the frontend talks to.
     krutrim_agent_celery/   Celery worker: RAG ingestion + embedding precompute
                            against the same storage libs. WHY: keeps slow
                            document work off the request path.
@@ -75,8 +73,6 @@ libs/          Frontend (Nx) packages.
                     WHY: no codegen; the API contract stays explicit and diffable.
   ui/               Generic shadcn/radix-style primitives. WHY: the design-system
                     layer shared by every frontend surface.
-  tauri-utils/      Tauri-runtime detection. WHY: lets the shared renderer branch
-                    web vs. desktop at runtime.
 
 docker/          sandbox.Dockerfile (agent execution image) + docker-compose.yml.
 docs/            Living documentation (app-flow.md, usage/use-case docs).
@@ -98,12 +94,11 @@ Auth lives in `krutrim_agent_backend/auth/` (argon2id + HS256 JWT) over the `Aut
 
 ## Reference `.architecture/` for design context
 
-Before making a non-trivial change to how a component is wired (routing, the sandbox, the provider/model system, the AG-UI message flow, the plugin registry, the desktop shell), read the relevant note in `.architecture/`:
+Before making a non-trivial change to how a component is wired (routing, the sandbox, the provider/model system, the AG-UI message flow, the plugin registry), read the relevant note in `.architecture/`:
 
 - `agui-message-flow.md` — the exact request/response trace between frontend and backend
 - `core-plugin-architecture.md` — the core/plugin boundary and why it's drawn where it is
 - `sandbox-design.md` — what the Docker sandbox isolates and why (one container per profile, not per thread or shared)
-- `desktop-shell-evolution.md` — why `apps/desktop` is Tauri, not Electron, and what's deliberately left unfinished
 - `coding-agent-sketch.md` — a design sketch (not built) for why a future "coding"/PR-drafting agent profile needs a more privileged sandbox than today's profiles share
 
 These notes exist so both AI agents and humans share the same mental model of *why* the system is built this way, not just what the code currently does. Read them for context — but see the strict edit policy below before touching them.

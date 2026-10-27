@@ -27,10 +27,14 @@ dependencies = [
     "krutrim-agent-sandbox",
     "krutrim-agent-rag",
     "krutrim-agents",
+    "krutrim-agents-core",
     "krutrim-agent-extensions",
+    "krutrim-agent-utils",
 ]
 
 [tool.uv.sources]
+krutrim-agents-core = { workspace = true }
+krutrim-agent-utils = { workspace = true }
 krutrim-agent-management = { workspace = true }
 krutrim-agent-agui = { workspace = true }
 krutrim-agent-sandbox = { workspace = true }

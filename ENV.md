@@ -46,7 +46,7 @@ python3 -m scripts.generate_env full   # every field, all commented (reference)
 | --- | --- | --- | --- | --- |
 | `KRUTRIM_AGENT_HOST` |  | server | `0.0.0.0` | Bind address. |
 | `KRUTRIM_AGENT_PORT` |  | server | `8000` | Bind port. |
-| `KRUTRIM_AGENT_HOME_ROOT` |  | server | `~/.krutrim_agent` | Root of the runtime-config tree (.jwt_secret, user table, per-user config/mcp/credentials, storage, logs). A desktop build points this at an OS app-data dir instead. |
+| `KRUTRIM_AGENT_HOME_ROOT` |  | server | `~/.krutrim_agent` | Root of the runtime-config tree (.jwt_secret, user table, per-user config/mcp/credentials, storage, logs). |
 | `KRUTRIM_AGENT_GRAPH_RECURSION_LIMIT` |  | server | `100` | LangGraph super-step cap per agent turn — raise for deep research / subagent loops. |
 | `KRUTRIM_AGENT_RAG_EMBEDDING_MODEL` |  | server | `qwen/qwen3-embedding-8b` | Embedding model for RAG ingestion + query. Server tier because it must match what's already stored in the vector index. |
 | `KRUTRIM_AGENT_CORS_ORIGINS` |  | server | `["http://localhost:4200","http://localhost:5173"]` | Allowed frontend origins. Add the Vite dev-server origins locally; set to your real frontend origin(s) in production. |

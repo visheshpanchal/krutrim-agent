@@ -46,9 +46,6 @@ __pycache__
 # Docker build secrets (github_token for the private faisslite clone)
 docker/.secrets/
 
-# Electron build output
-apps/desktop/release/
-apps/desktop/dist-renderer/
 
 
 

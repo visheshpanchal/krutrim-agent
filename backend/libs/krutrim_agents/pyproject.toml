@@ -7,12 +7,14 @@ dependencies = [
     "deepagents>=0.7.0",
     "krutrim-agents-core",
     "krutrim-agent-rag",
+    "krutrim-agent-management",
     "promptstore @ git+https://github.com/vebcol-org/promptstore.git",
 ]
 
 [tool.uv.sources]
 krutrim-agents-core = { workspace = true }
 krutrim-agent-rag = { workspace = true }
+krutrim-agent-management = { workspace = true }
 
 # Forwards to krutrim_agent_rag's own gpu extra (faiss-gpu-cu12). See
 # docker/backend.Dockerfile and docker/celery.Dockerfile's BUILD arg.

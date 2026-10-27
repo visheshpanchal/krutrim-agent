@@ -1,6 +1,6 @@
 # Krutrim Agent
 
-A pluggable, multi-agent-type platform. A LangGraph + [deepagents](https://docs.langchain.com/oss/python/deepagents/overview) backend (Python) hosts independent agent **profiles** — this build’s is `research` — and streams to a pure-React frontend (web + Tauri desktop) over the AG-UI protocol via `@ag-ui/client`’s `HttpAgent`, with no runtime process in between. Chat sits in a left pane; the agent’s finished deliverable renders in a right-hand canvas.
+A pluggable, multi-agent-type platform. A LangGraph + [deepagents](https://docs.langchain.com/oss/python/deepagents/overview) backend (Python) hosts independent agent **profiles** — this build’s is `research` — and streams to a pure-React web frontend over the AG-UI protocol via `@ag-ui/client`’s `HttpAgent`, with no runtime process in between. Chat sits in a left pane; the agent’s finished deliverable renders in a right-hand canvas.
 
 ## Core / plugin split
 
@@ -83,7 +83,7 @@ The plain, profile-less chat screen (`POST /api/chat`). Deliberately minimal by 
 | Document parsing: DOCX | Completed | Via docling |
 | Async RAG ingestion | Completed | Celery worker; a cluster-wide Redis mutex currently serializes ingestion jobs one-at-a-time (no parallelism yet) |
 | Async embedding precompute | Completed | Bulk-embeds a session’s already-uploaded files |
-| Frontend: web + Tauri desktop | Completed | One React renderer |
+| Frontend: web | Completed | One React renderer |
 | Plain non-agentic chat screen | Completed | `/api/chat` — see [Chat](#chat) |
 | Live model / provider settings | Completed | Per-role selection is genuinely live — the graph is rebuilt per request, so a change applies on the next turn with no restart |
 | Live retrieval-strategy / web-search-provider settings | Broken / no-op | Declared as hot-reloadable in the settings schema, but never read by the code path that would need them (see the two rows above) |
@@ -93,8 +93,6 @@ The plain, profile-less chat screen (`POST /api/chat`). Deliberately minimal by 
 | Sandbox: container / network / resource isolation | Not built (removed) | The Docker + gRPC in-sandbox runtime was removed 2026-08-30; the current backend is a deliberate placeholder (“no container, no isolation”) |
 | Domain tools (market data, quotes / OHLCV, …) | Not built |  |
 | `shared-types` codegen from Pydantic models | Not built | Hand-synced |
-| Desktop: real app icon | Completed | Custom-designed icon, not Tauri’s default |
-| Desktop: auto-spawn backend | Not built | No sidecar/process-spawn code exists in `src-tauri` |
 | Dataset-driven eval runner | Not built | Run-transcript recording exists (JSONL), but there’s no dataset/replay/scoring harness that consumes it |
 | More agent profiles (trading / sales) | Not built |  |
 | Coding / PR-drafting agent | Not built | Deliberate — needs a more privileged sandbox (egress-allowlisted, git-capable, no credentials exposed to the shell) plus a human-approval gate before any push |
@@ -130,8 +128,6 @@ This project already splits “core” from “plugin” along several **indepen
     
 -   Optional: Docker — only for the full `docker/` compose stack, or a standalone Redis (Celery / RAG ingestion) or Qdrant
     
--   Desktop app only: a Rust toolchain (`rustup`/`cargo`) plus Tauri’s [system dependencies](https://v2.tauri.app/start/prerequisites/)
-    
 
 ## Setup
 
@@ -165,8 +161,6 @@ cd backend && uv run uvicorn krutrim_agent_backend.main:app --reload --port 8000
 
 # Frontend — web
 pnpm run web                       # apps/web → http://localhost:4200
-# ...or desktop (needs the Rust toolchain)
-pnpm exec nx run desktop:serve     # runs `tauri dev`
 
 # Optional — RAG document ingestion + embedding precompute (needs Redis)
 docker compose -f docker/docker-compose.yml up redis

@@ -109,7 +109,6 @@ SECTIONS: list[Section] = [
             Field(
                 "KRUTRIM_AGENT_HOME_ROOT",
                 "Root of the runtime-config tree (.jwt_secret, user table, per-user config/mcp/credentials, storage, logs).",
-                context="A desktop build points this at an OS app-data dir instead.",
                 tier="server",
                 default="~/.krutrim_agent",
             ),

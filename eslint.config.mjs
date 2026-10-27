@@ -30,7 +30,6 @@ export default [
             'tsconfig.base.json',
             'libs/*/tsconfig.lib.json',
             'apps/web/tsconfig.app.json',
-            'apps/desktop/tsconfig.renderer.json',
           ],
           noWarnOnMultipleProjects: true,
         }),
